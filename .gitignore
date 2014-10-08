@@ -1,4 +1,4 @@
 ebin/**
-**/*.beam
-**/*.plt
+*.beam
+*.plt
 **/erl_crash.dump
