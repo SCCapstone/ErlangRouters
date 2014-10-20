@@ -7,8 +7,7 @@
 
 
 %% ----------------------------------------------------------------------------
-%% @doc main
-%% @end
+%% @doc main.
 %% 
 main([Arg]) ->
   N = list_to_integer(atom_to_list(Arg)),
@@ -18,8 +17,8 @@ main([Arg]) ->
 
 
 %% ----------------------------------------------------------------------------
-%% @doc Server with state to record number of times called. 
-%% 
+%% @doc server.
+%% Maintains a sate to record the number of times it is called.
 server(State) ->
   receive
     {request, Return_PID} ->
@@ -33,8 +32,8 @@ server(State) ->
 
 
 %% ----------------------------------------------------------------------------  
-%% @doc Client.
-%% Takes server PID as parameter, sends request and prints out value
+%% @doc client(Server_Address).
+%% Takes server PID as parameter, sends request and prints out value.
 %%
 client(Server_Address) ->
   Server_Address ! {request, self()},
@@ -46,7 +45,8 @@ client(Server_Address) ->
 
 
 %% ----------------------------------------------------------------------------  
-%% @doc Start;Initiate test with servers and client.
+%% @doc start.
+%% Initiate test with servers and client.
 %%
 start(N) ->
   Server_PID = spawn(simulator,server,[0]),
@@ -55,8 +55,8 @@ start(N) ->
   
 
 %% ----------------------------------------------------------------------------
-%% @doc Spawn clients
-%% 
+%% @doc spawn_n. 
+%% Spawns clients
 spawn_n(N, Server_PID) ->
   if
     N>0 ->
