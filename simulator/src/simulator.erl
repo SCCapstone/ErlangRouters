@@ -1,9 +1,9 @@
 %% @doc This is our initial simulation material.
-%% @version 0.0
-%% @TODO A lot, presumably
+%% @version 0.2
+%% @TODO Add proper group functionality.
 -module(simulator).
 
--export([main/1,server/1,client/1,start/1,spawn_n/2]).
+-export([main/1,server/2,client/2,start/1,spawn_n/2,createServer/1]).
 
 
 %% ----------------------------------------------------------------------------
@@ -18,15 +18,17 @@ main([Arg]) ->
 
 %% ----------------------------------------------------------------------------
 %% @doc server.
-%% Maintains a sate to record the number of times it is called.
-server(State) ->
-  receive
-    {request, Return_PID} ->
-      io:format("Server ~w: Client request received from ~w~n",
-          [self(), Return_PID]),
+%% Maintains a state to record the number of times it is called.
+server(State, Group_ID) ->
+  receive 
+    {request, Return_PID, Group} when Group =:= Group_ID ->
+      io:format("Server ~w: Client request received from ~w, Group_ID ~w~n",
+          [self(), Return_PID, Group_ID]),
       NewState = State + 1,
       Return_PID ! {hit_count, NewState},
-      server(NewState)
+      server(NewState, Group_ID)
+  %%after 0->
+    %%  createServer(Group_ID)
   end.
 
 
@@ -35,11 +37,13 @@ server(State) ->
 %% @doc client(Server_Address).
 %% Takes server PID as parameter, sends request and prints out value.
 %%
-client(Server_Address) ->
-  Server_Address ! {request, self()},
+client(Server_Address, Group) ->
+  Server_Address ! {request, self(), Group},
+  io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
   receive
     {hit_count, Number} ->
-      io:format("Client ~w: Hit count was ~w~n", [self(), Number])
+      io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n", 
+         [self(), Number, Group])
   end.
 
 
@@ -49,7 +53,8 @@ client(Server_Address) ->
 %% Initiate test with servers and client.
 %%
 start(N) ->
-  Server_PID = spawn(simulator,server,[0]),
+  Group_ID = random:uniform(5),
+  Server_PID = spawn(simulator,server,[0, Group_ID]),
   spawn_n(N ,Server_PID).
 
   
@@ -60,9 +65,22 @@ start(N) ->
 spawn_n(N, Server_PID) ->
   if
     N>0 ->
-      spawn(simulator,client,[Server_PID]),
+      spawn(simulator,client,[Server_PID, random:uniform(5)]),
       timer:sleep(random:uniform(100)),
       spawn_n(N-1,Server_PID);
     N == 0 ->
       io:format("Last client spawned. ~n")
   end.
+
+
+
+
+%% ----------------------------------------------------------------------------
+%% @doc spawn_n. 
+%% Spawns a new server. Not yet implemented, still trying to decide
+%% when best to use this.
+createServer(Group_ID) ->
+  spawn(simulator,server, [0, Group_ID]),
+  io:format("Server created for Group_ID ~w~n", [Group_ID]).
+			
+
