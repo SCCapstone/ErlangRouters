@@ -1,17 +1,18 @@
 %% @doc This is our initial simulation material.
 %% @version 0.2
 %% @TODO Add proper group functionality.
+%% Date Last Modified: 
 -module(simulator).
 
--export([main/1,server/2,client/2,start/1,spawn_n/2,createServer/1]).
+-export([main/0,server/1,client/2,start/1,spawn_n/2,spawnServers/1,decrement/1]).
 
 
 %% ----------------------------------------------------------------------------
 %% @doc main.
 %% 
-main([Arg]) ->
-  N = list_to_integer(atom_to_list(Arg)),
-  start(N),
+main() ->
+  XnumServers = 10,
+  spawnServers(XnumServers),
   init:stop().
 
 
@@ -19,16 +20,17 @@ main([Arg]) ->
 %% ----------------------------------------------------------------------------
 %% @doc server.
 %% Maintains a state to record the number of times it is called.
-server(State, Group_ID) ->
+server(State) ->
   receive 
-    {request, Return_PID, Group} when Group =:= Group_ID ->
-      io:format("Server ~w: Client request received from ~w, Group_ID ~w~n",
-          [self(), Return_PID, Group_ID]),
+    {request, Return_PID} ->
+      io:format("Server ~w: Client request received from ~w~n.",
+          [self(), Return_PID]),
       NewState = State + 1,
       Return_PID ! {hit_count, NewState},
-      server(NewState, Group_ID)
-  %%after 0->
-    %%  createServer(Group_ID)
+      server(NewState)
+    %{request, Return_PID, Group} when Group =/= Group_ID ->
+      %createServer(Group),
+      %server(0, Group)
   end.
 
 
@@ -53,8 +55,8 @@ client(Server_Address, Group) ->
 %% Initiate test with servers and client.
 %%
 start(N) ->
-  Group_ID = random:uniform(5),
-  Server_PID = spawn(simulator,server,[0, Group_ID]),
+  %%Group_ID = random:uniform(5),
+  Server_PID = spawn(simulator,server,[0, groupList]),
   spawn_n(N ,Server_PID).
 
   
@@ -73,14 +75,19 @@ spawn_n(N, Server_PID) ->
   end.
 
 
-
-
 %% ----------------------------------------------------------------------------
 %% @doc spawn_n. 
 %% Spawns a new server. Not yet implemented, still trying to decide
 %% when best to use this.
-createServer(Group_ID) ->
-  spawn(simulator,server, [0, Group_ID]),
-  io:format("Server created for Group_ID ~w~n", [Group_ID]).
-			
+spawnServers(XnumServers) when XnumServers > 0 ->
+	io:format("Number of servers left to spawn: ~w.~n", [XnumServers]),
+	Server_PID = spawn(simulator, server, [0]),
+	%%[Server_PID | spawnServers(decrement(XnumServers))];
+		
+spawnServers(0) -> 
+  [],
+	io:format("All servers spawned.~n").
 
+decrement(X) -> 
+	X - 1.
+%%Algorithm: Take into account the capacity on each server. 
