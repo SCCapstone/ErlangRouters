@@ -1,94 +1,105 @@
-%% @doc This is our initial simulation material.
-%% @version 0.2
-%% @TODO Add proper group functionality.
-%% Date Last Modified: 
+%% @doc Simulator.
+%% The simulator that contains functions that represent the server
+%% and client containers. Also contains functions to spawn a certain
+%% number of servers/clients based on what the overseer module wants
+%% to have spawned. Essentially, this module simulates clients pinging
+%% hosts in a cluster.
+%% @version 1.2
+%% @TODO Add functionality to account for server load capacity.
+%% Date Last Modified: 11/18/2014
 -module(simulator).
--export([server/1,client/2,start/1,spawn_n/2,spawnServers/2,decrement/1]).
-
-
-%% ----------------------------------------------------------------------------
-%% @doc main.
-%% 
-%%main() ->
-  %%NumServers = 10,
-  %%spawnServers(NumServers),
-  %%init:stop().
-
-
+-export([server/1,client/2,spawnClients/2,spawnServers/2,decrement/1]).
 
 %% ----------------------------------------------------------------------------
-%% @doc server.
-%% Maintains a state to record the number of times it is called.
+%% @doc server(State).
+%% Represents a server. Maintains a server State to represent the number
+%% of times a server is pinged by clients. If the server receives a 
+%% request from a client, it accepts the client and sends a message back
+%% to the client with the current hit count of the server and then the
+%% server function is recursively called.
 server(State) ->
   receive 
     {request, Return_PID} ->
-      io:format("Server ~w: Client request received from ~w~n.",
+      io:format("Server ~w: Client request received from ~w~n",
           [self(), Return_PID]),
       NewState = State + 1,
       Return_PID ! {hit_count, NewState},
       server(NewState)
-    %{request, Return_PID, Group} when Group =/= Group_ID ->
-      %createServer(Group),
-      %server(0, Group)
   end.
-
-
 
 %% ----------------------------------------------------------------------------  
 %% @doc client(Server_Address).
-%% Takes server PID as parameter, sends request and prints out value.
+%% Represents a client. The client contains a server address for the 
+%% server that it is initially going to ping and a group ID (Group). The
+%% client sends a message to the server with PID Server_Address with its
+%% request and own process ID. The client recieves a message from the 
+%% server pinged letting the client know that it is now on the server with
+%% the server hit count.
 %%
 client(Server_Address, Group) ->
-  Server_Address ! {request, self(), Group},
+  Server_Address ! {request, self()},
   io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
   receive
     {hit_count, Number} ->
-      io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n", 
+      io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
          [self(), Number, Group])
   end.
 
-
-
-%% ----------------------------------------------------------------------------  
-%% @doc start.
-%% Initiate test with servers and client.
-%%
-start(N) ->
-  %%Group_ID = random:uniform(5),
-  Server_PID = spawn(simulator,server,[0, groupList]),
-  spawn_n(N ,Server_PID).
-
-  
+%% ----------------------------------------------------------------------------
+%% @doc spawnClients(NumClients, ServerList).
+%% Spawns a number of clients equal to the number of clients (NumClients)
+%% that the overseer wants to spawn. The function recursively calls itself
+%% to spawn a client one by one until there are no clients left to spawn.
+%% For each recursive call, a random Server_PID is chosen by the function
+%% pickRandomServer and a client is spawned with a random GroupID between
+%% 1 and 5 that will ping the server specified by that random Server_PID
+%% chosen. A timer is set to simulate the amount of time between client
+%% pings on a host and then the function is recursively called. Once there
+%% are no more clients to spawn, a message is printed to the console letting
+%% the user know that the spawning is done.
+spawnClients(NumClients, ServerList) when NumClients > 0 ->
+  Server_PID = pickRandomServer(ServerList),
+  spawn(simulator,client,[Server_PID, random:uniform(5)]),
+  timer:sleep(random:uniform(100)),
+  spawnClients(decrement(NumClients),ServerList);
+spawnClients(0, ServerList) ->
+  io:format("Last client spawned. ~n").
 
 %% ----------------------------------------------------------------------------
-%% @doc spawn_n. 
-%% Spawns clients
-spawn_n(N, Server_PID) ->
-  if
-    N>0 ->
-      spawn(simulator,client,[Server_PID, random:uniform(5)]),
-      timer:sleep(random:uniform(100)),
-      spawn_n(N-1,Server_PID);
-    N == 0 ->
-      io:format("Last client spawned. ~n")
-  end.
-
-
-%% ----------------------------------------------------------------------------
-%% @doc spawn_n. 
-%% Spawns a new server. Not yet implemented, still trying to decide
-%% when best to use this.
+%% @doc spawnServers(NumServers, ServerList).
+%% Spawns a number of servers equal to the number of servers (NumServers)
+%% that the overseer wants to spawn. The function prints the number of 
+%% servers left to spawn, spawns a server with a certain PID, adds that
+%% PID to a temporary list and prints it, and recursively calls the 
+%% function with the parameters (NumServers-1, ServerList+PIDlist).
+%% When there are no servers left to spawn, a message is printed to the
+%% console letting the user know that all the servers have spawned and
+%% ServerList, the list of the Server_PIDs from every server spawned,
+%% is returned. 
 spawnServers(NumServers, ServerList) when NumServers > 0 ->
-	io:format("Number of servers left to spawn: ~w~n", [NumServers]),
-	Server_PID = spawn(simulator, server, [0]),
-	PIDlist = [Server_PID],
-	io:format("Server ~w spawned.~n", [Server_PID]),
-	TempServerList = ServerList ++ PIDlist,
-	spawnServers(decrement(NumServers), TempServerList);		
+  io:format("Number of servers left to spawn: ~w~n", [NumServers]),
+  Server_PID = spawn(simulator, server, [0]),
+  PIDlist = [Server_PID],
+  io:format("Server ~w spawned.~n", [Server_PID]),
+  TempServerList = ServerList ++ PIDlist,
+  spawnServers(decrement(NumServers), TempServerList);		
 spawnServers(0, ServerList) -> 
-	io:format("All servers spawned.~n"),
-	ServerList.
+  io:format("~nAll servers spawned.~n~n"),
+  ServerList.
 
+%% ----------------------------------------------------------------------------
+%% @doc pickRandomServer(ServerList). 
+%% Takes in the list of all Server_PIDs spawned by the simulator and 
+%% returns a random Server_PID from ServerList.
+pickRandomServer(ServerList) ->
+  ListIndex = random:uniform(length(ServerList)),
+  Server_PID = lists:nth(ListIndex, ServerList),
+  Server_PID.
+
+%% ----------------------------------------------------------------------------
+%% @doc decrement(X).
+%% Decrements the value of the number taken in by the function by 1 and 
+%% returns that value. 
 decrement(X) -> 
 	X - 1.
-%%Algorithm: Take into account the capacity on each server. 
+
