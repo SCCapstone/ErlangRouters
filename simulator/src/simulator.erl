@@ -3,17 +3,16 @@
 %% @TODO Add proper group functionality.
 %% Date Last Modified: 
 -module(simulator).
-
--export([main/0,server/1,client/2,start/1,spawn_n/2,spawnServers/1,decrement/1]).
+-export([server/1,client/2,start/1,spawn_n/2,spawnServers/2,decrement/1]).
 
 
 %% ----------------------------------------------------------------------------
 %% @doc main.
 %% 
-main() ->
-  XnumServers = 10,
-  spawnServers(XnumServers),
-  init:stop().
+%%main() ->
+  %%NumServers = 10,
+  %%spawnServers(NumServers),
+  %%init:stop().
 
 
 
@@ -79,14 +78,16 @@ spawn_n(N, Server_PID) ->
 %% @doc spawn_n. 
 %% Spawns a new server. Not yet implemented, still trying to decide
 %% when best to use this.
-spawnServers(XnumServers) when XnumServers > 0 ->
-	io:format("Number of servers left to spawn: ~w.~n", [XnumServers]),
+spawnServers(NumServers, ServerList) when NumServers > 0 ->
+	io:format("Number of servers left to spawn: ~w~n", [NumServers]),
 	Server_PID = spawn(simulator, server, [0]),
-	%%[Server_PID | spawnServers(decrement(XnumServers))];
-		
-spawnServers(0) -> 
-  [],
-	io:format("All servers spawned.~n").
+	PIDlist = [Server_PID],
+	io:format("Server ~w spawned.~n", [Server_PID]),
+	TempServerList = ServerList ++ PIDlist,
+	spawnServers(decrement(NumServers), TempServerList);		
+spawnServers(0, ServerList) -> 
+	io:format("All servers spawned.~n"),
+	ServerList.
 
 decrement(X) -> 
 	X - 1.
