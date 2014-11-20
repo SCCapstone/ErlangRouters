@@ -9,8 +9,8 @@
 %% Date Last Modified: 11/18/2014
 
 -module(overseer).
--export([main/0]).
--import(simulator, [spawnServers/2, spawnClients/2]).
+-export([main/0, storeKeys/4]).
+-import(simulator, [spawnServers/2, spawnClients/3]).
 
 %% ----------------------------------------------------------------------------
 %% @doc main().
@@ -23,10 +23,26 @@ main() ->
   NumberOfClients = 100,
   NumberOfServers = 10,
   TempServerList = [],
+  TempServerDict = orddict:new(),
   
   io:format("Number of clients: ~w~n", [NumberOfClients]),
   io:format("Number of servers: ~w~n", [NumberOfServers]),
   
   ServerList = spawnServers(NumberOfServers, TempServerList),
-  spawnClients(NumberOfClients, ServerList).
+  ServerDict = storeKeys(TempServerDict, ServerList, 1, NumberOfServers),
+  
+  ServerDict2 = spawnClients(NumberOfClients, ServerList, ServerDict).
+  
+storeKeys(ServerDict, ServerList, ListIndex, NumberOfServers) when ListIndex =< NumberOfServers ->
+		Current_PID = lists:nth(ListIndex, ServerList),
+		io:format("Current PID: ~w~n", [Current_PID]),
+		TempServerDict = orddict:store(Current_PID, [], ServerDict),
+		TempValue = orddict:fetch(Current_PID, TempServerDict),
+		io:format("Value now stored in ServerDict: ~w~n", [TempValue]),
+		storeKeys(TempServerDict, ServerList, ListIndex+1, NumberOfServers);
+storeKeys(TempServerDict, ServerList, 11, NumberOfServers) ->
+	io:format("Key storage complete.~n~n"),
+	TempServerDict.
+		
+	
  
