@@ -8,7 +8,7 @@
 %% @TODO Add functionality to account for server load capacity.
 %% Date Last Modified: 11/18/2014
 -module(simulator).
--export([server/1,client/2,spawnClients/2,spawnServers/2,decrement/1]).
+-export([server/1,client/2,spawnClients/3,spawnServers/2,decrement/1]).
 
 %% ----------------------------------------------------------------------------
 %% @doc server(State).
@@ -44,6 +44,7 @@ client(Server_Address, Group) ->
       io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
          [self(), Number, Group])
   end.
+  %%client(Server_Address, Group).
 
 %% ----------------------------------------------------------------------------
 %% @doc spawnClients(NumClients, ServerList).
@@ -57,13 +58,20 @@ client(Server_Address, Group) ->
 %% pings on a host and then the function is recursively called. Once there
 %% are no more clients to spawn, a message is printed to the console letting
 %% the user know that the spawning is done.
-spawnClients(NumClients, ServerList) when NumClients > 0 ->
+%%
+%% Note: while the clients are spawning, they are also being added to ServerDict,
+%% the ordered dictionary in Overseer that is keeping track of the servers and
+%% all their grouped clients.
+spawnClients(NumClients, ServerList, ServerDict) when NumClients > 0 ->
   Server_PID = pickRandomServer(ServerList),
-  spawn(simulator,client,[Server_PID, random:uniform(5)]),
+  Group_ID = random:uniform(5),
+  Client_PID = spawn(simulator,client,[Server_PID, Group_ID]),
+  TempServerDict = orddict:append(Server_PID, {Client_PID, Group_ID}, ServerDict),
   timer:sleep(random:uniform(100)),
-  spawnClients(decrement(NumClients),ServerList);
-spawnClients(0, ServerList) ->
-  io:format("Last client spawned. ~n").
+  spawnClients(decrement(NumClients),ServerList, TempServerDict);
+spawnClients(0, ServerList, TempServerDict) ->
+  io:format("Last client spawned. ~n~n"),
+  TempServerDict.
 
 %% ----------------------------------------------------------------------------
 %% @doc spawnServers(NumServers, ServerList).
