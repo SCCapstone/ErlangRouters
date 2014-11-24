@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<title>Server/Client Relationship with Groups</title>
 <style>
-
+	
 #title {
 	font-family: serif;
 	font-variant: small-caps;
@@ -11,7 +10,6 @@
     text-decoration: underline;
     text-shadow: 2px 2px 2px gray;
 }
-
 
 body {
   font: 10px sans-serif;
@@ -66,7 +64,7 @@ var svg = d3.select("body").append("svg")
   .append("g")
     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-d3.csv("stackedbarchartexampledata.csv", function(error, data) {
+d3.csv("States.csv", function(error, data) {
   color.domain(d3.keys(data[0]).filter(function(key) { return key !== "State"; }));
 
   data.forEach(function(d) {
@@ -75,7 +73,7 @@ d3.csv("stackedbarchartexampledata.csv", function(error, data) {
     d.total = d.ages[d.ages.length - 1].y1;
   });
 
-  data.sort(function(a, b) { return b.total - a.total; });
+  //data.sort(function(a, b) { return b.total - a.total; });
 
   x.domain(data.map(function(d) { return d.State; }));
   y.domain([0, d3.max(data, function(d) { return d.total; })]);
@@ -93,7 +91,7 @@ d3.csv("stackedbarchartexampledata.csv", function(error, data) {
       .attr("y", 6)
       .attr("dy", ".71em")
       .style("text-anchor", "end")
-      .text("Population");
+      .text("Number of Clients");
 
   var state = svg.selectAll(".state")
       .data(data)
