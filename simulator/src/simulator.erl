@@ -6,9 +6,10 @@
 %% hosts in a cluster.
 %% @version 1.2
 %% @TODO Add functionality to account for server load capacity.
-%% Date Last Modified: 11/18/2014
+%% Date Last Modified: 11/20/2014
 -module(simulator).
--export([server/1,client/2,spawnClients/3,spawnServers/2,decrement/1]).
+-export([server/1,client/3,spawnClients/5,spawnServers/2, pickRandomServer/1]).
+-import(overseer, [dictionary/1]).
 
 %% ----------------------------------------------------------------------------
 %% @doc server(State).
@@ -26,7 +27,7 @@ server(State) ->
       Return_PID ! {hit_count, NewState},
       server(NewState)
   end.
-
+  
 %% ----------------------------------------------------------------------------  
 %% @doc client(Server_Address).
 %% Represents a client. The client contains a server address for the 
@@ -36,15 +37,16 @@ server(State) ->
 %% server pinged letting the client know that it is now on the server with
 %% the server hit count.
 %%
-client(Server_Address, Group) ->
+client(Server_Address, Group, Dict_ID) ->
   Server_Address ! {request, self()},
   io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
   receive
     {hit_count, Number} ->
       io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
-         [self(), Number, Group])
-  end.
-  %%client(Server_Address, Group).
+        [self(), Number, Group])
+  end,
+  Dict_ID ! {request, self(), Group, Server_Address}.
+  %%client(Server_Address, Group, Dict_ID).
 
 %% ----------------------------------------------------------------------------
 %% @doc spawnClients(NumClients, ServerList).
@@ -62,16 +64,16 @@ client(Server_Address, Group) ->
 %% Note: while the clients are spawning, they are also being added to ServerDict,
 %% the ordered dictionary in Overseer that is keeping track of the servers and
 %% all their grouped clients.
-spawnClients(NumClients, ServerList, ServerDict) when NumClients > 0 ->
+spawnClients(NumClients, ServerList, Dict_ID, Dictionary, NumberOfGroups) when NumClients > 0 ->
   Server_PID = pickRandomServer(ServerList),
-  Group_ID = random:uniform(5),
-  Client_PID = spawn(simulator,client,[Server_PID, Group_ID]),
-  TempServerDict = orddict:append(Server_PID, {Client_PID, Group_ID}, ServerDict),
+  Group_ID = random:uniform(NumberOfGroups),
+  Client_PID = spawn(simulator,client,[Server_PID, Group_ID, Dict_ID]),
+  TempServerDict = orddict:append(Server_PID, {Client_PID, Group_ID}, Dictionary),
   timer:sleep(random:uniform(100)),
-  spawnClients(decrement(NumClients),ServerList, TempServerDict);
-spawnClients(0, ServerList, TempServerDict) ->
+  spawnClients(NumClients-1,ServerList, Dict_ID, TempServerDict, NumberOfGroups);
+spawnClients(0, ServerList, Dict_ID, Dictionary, NumberOfGroups) ->
   io:format("Last client spawned. ~n~n"),
-  TempServerDict.
+  Dictionary.
 
 %% ----------------------------------------------------------------------------
 %% @doc spawnServers(NumServers, ServerList).
@@ -90,7 +92,7 @@ spawnServers(NumServers, ServerList) when NumServers > 0 ->
   PIDlist = [Server_PID],
   io:format("Server ~w spawned.~n", [Server_PID]),
   TempServerList = ServerList ++ PIDlist,
-  spawnServers(decrement(NumServers), TempServerList);		
+  spawnServers(NumServers-1, TempServerList);		
 spawnServers(0, ServerList) -> 
   io:format("~nAll servers spawned.~n~n"),
   ServerList.
@@ -104,10 +106,4 @@ pickRandomServer(ServerList) ->
   Server_PID = lists:nth(ListIndex, ServerList),
   Server_PID.
 
-%% ----------------------------------------------------------------------------
-%% @doc decrement(X).
-%% Decrements the value of the number taken in by the function by 1 and 
-%% returns that value. 
-decrement(X) -> 
-	X - 1.
 
