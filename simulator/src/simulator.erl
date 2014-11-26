@@ -8,7 +8,7 @@
 %% @TODO Add functionality to account for server load capacity.
 %% Date Last Modified: 11/20/2014
 -module(simulator).
--export([server/1,client/3,spawnClients/5,spawnServers/2, pickRandomServer/1]).
+-export([server/1,client/3,spawn_clients/5,spawn_servers/2, pick_random_server/1]).
 -import(overseer, [dictionary/1]).
 
 %% ----------------------------------------------------------------------------
@@ -22,7 +22,7 @@ server(State) ->
   receive 
     {request, Return_PID} ->
       io:format("Server ~w: Client request received from ~w~n",
-          [self(), Return_PID]),
+        [self(), Return_PID]),
       NewState = State + 1,
       Return_PID ! {hit_count, NewState},
       server(NewState)
@@ -64,14 +64,14 @@ client(Server_Address, Group, Dict_ID) ->
 %% Note: while the clients are spawning, they are also being added to ServerDict,
 %% the ordered dictionary in Overseer that is keeping track of the servers and
 %% all their grouped clients.
-spawnClients(NumClients, ServerList, Dict_ID, Dictionary, NumberOfGroups) when NumClients > 0 ->
-  Server_PID = pickRandomServer(ServerList),
+spawn_clients(NumClients, ServerList, Dict_ID, Dictionary, NumberOfGroups) when NumClients > 0 ->
+  Server_PID = pick_random_server(ServerList),
   Group_ID = random:uniform(NumberOfGroups),
   Client_PID = spawn(simulator,client,[Server_PID, Group_ID, Dict_ID]),
   TempServerDict = orddict:append(Server_PID, {Client_PID, Group_ID}, Dictionary),
   timer:sleep(random:uniform(100)),
-  spawnClients(NumClients-1,ServerList, Dict_ID, TempServerDict, NumberOfGroups);
-spawnClients(0, ServerList, Dict_ID, Dictionary, NumberOfGroups) ->
+  spawn_clients(NumClients-1,ServerList, Dict_ID, TempServerDict, NumberOfGroups);
+spawn_clients(0, ServerList, Dict_ID, Dictionary, NumberOfGroups) ->
   io:format("Last client spawned. ~n~n"),
   Dictionary.
 
@@ -86,14 +86,14 @@ spawnClients(0, ServerList, Dict_ID, Dictionary, NumberOfGroups) ->
 %% console letting the user know that all the servers have spawned and
 %% ServerList, the list of the Server_PIDs from every server spawned,
 %% is returned. 
-spawnServers(NumServers, ServerList) when NumServers > 0 ->
+spawn_servers(NumServers, ServerList) when NumServers > 0 ->
   io:format("Number of servers left to spawn: ~w~n", [NumServers]),
   Server_PID = spawn(simulator, server, [0]),
   PIDlist = [Server_PID],
   io:format("Server ~w spawned.~n", [Server_PID]),
   TempServerList = ServerList ++ PIDlist,
-  spawnServers(NumServers-1, TempServerList);		
-spawnServers(0, ServerList) -> 
+  spawn_servers(NumServers-1, TempServerList);   
+spawn_servers(0, ServerList) -> 
   io:format("~nAll servers spawned.~n~n"),
   ServerList.
 
@@ -101,7 +101,7 @@ spawnServers(0, ServerList) ->
 %% @doc pickRandomServer(ServerList). 
 %% Takes in the list of all Server_PIDs spawned by the simulator and 
 %% returns a random Server_PID from ServerList.
-pickRandomServer(ServerList) ->
+pick_random_server(ServerList) ->
   ListIndex = random:uniform(length(ServerList)),
   Server_PID = lists:nth(ListIndex, ServerList),
   Server_PID.
