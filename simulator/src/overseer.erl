@@ -6,10 +6,11 @@
 %% @version 1.1
 %% @TODO Add functionality to enter NumberOfClients, NumberOfServers,
 %% and NumberOfGroups from the command line.
-%% Date Last Modified: 11/20/2014
+%% Date Last Modified: 12/02/2014
 
 -module(overseer).
--export([main/0, store_keys/4, print_info/6, get_second_element/3, print_group_count/4, print_file_header/3, count_groups/4, get_num_clients/4, dictionary/1]).
+-export([main/0, store_keys/4, print_info/7, get_second_element/3, print_group_count/4,
+ print_file_header/3, count_groups/4, get_num_clients/4, dictionary/1, print_updated_clients/4]).
 -import(simulator, [spawn_servers/2, spawn_clients/5, client/3]).
 
 %% ----------------------------------------------------------------------------
@@ -23,15 +24,18 @@ main() ->
   NumberOfClients = 100,
   NumberOfServers = 10,
   NumberOfGroups = 7,
+  ServerCapacity = 10,
   TempServerList = [],
   TempServerDict = orddict:new(),
   Dict = orddict:new(),
   Dictionary = orddict:new(),
-  
+  TempGroupList = [],
+
   OneFile = file:open("before.csv", write),
   FilePID = element(2, OneFile),
-  %register(File1, FilePID),
-  
+  TwoFile = file:open("after.csv", write),
+  FilePID2 = element(2, TwoFile),
+ 
   Dict_ID = spawn(overseer, dictionary, [Dict]),
   io:format("Number of clients: ~w~n", [NumberOfClients]),
   io:format("Number of servers: ~w~n", [NumberOfServers]),
@@ -46,9 +50,16 @@ main() ->
   io:fwrite(FilePID, "Servers,", []),
   print_file_header(FilePID, 1, NumberOfGroups),
   
-  print_info(ServerDict2, ServerList, FilePID, 1, NumberOfServers, NumberOfGroups),
+  GroupList = print_info(ServerDict2, ServerList, FilePID, 1, NumberOfServers, NumberOfGroups, TempGroupList),
   
-  Dict.
+  GroupList,
+  
+  SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
+  
+  io:fwrite(FilePID2, "Servers,", []),
+  print_file_header(FilePID2, 1, NumberOfGroups),
+  
+  print_updated_clients(SortedGroupList, FilePID2, 1, NumberOfGroups).
 
 %% ----------------------------------------------------------------------------
 %% @doc storeKeys().
@@ -64,7 +75,17 @@ store_keys(TempServerDict, ServerList, 11, NumberOfServers) ->
   io:format("Key storage complete.~n~n"),
   TempServerDict.
 
-print_info(ServerDict, ServerList, File_PID, ServerCount, NumberOfServers, NumberOfGroups) when ServerCount =< NumberOfServers ->
+print_updated_clients(SortedGroupList, File_PID, GroupIndex, NumberOfGroups) when GroupIndex =< length(SortedGroupList) ->
+	GroupCount = lists:nth(GroupIndex, SortedGroupList),
+	io:fwrite(File_PID, "Server ~w,", [GroupIndex]),
+	print_group_count(File_PID, GroupCount, 1, NumberOfGroups),
+	print_updated_clients(SortedGroupList, File_PID, GroupIndex+1, NumberOfGroups);
+print_updated_clients(SortedGroupList, File_PID, GroupIndex, NumberOfGroups) ->
+	io:format("Updated client assignments printed to after.csv.~n", []).
+	
+	
+	
+print_info(ServerDict, ServerList, File_PID, ServerCount, NumberOfServers, NumberOfGroups, FullGroupList) when ServerCount =< NumberOfServers ->
   KeyList = orddict:fetch_keys(ServerDict),
   Server_PID = lists:nth(ServerCount, ServerList),
   io:format("Server_PID in printInfo: ~w~n", [Server_PID]),
@@ -76,9 +97,11 @@ print_info(ServerDict, ServerList, File_PID, ServerCount, NumberOfServers, Numbe
   io:format("GroupCount in printInfo: ~w~n", [GroupCount]),
   io:fwrite(File_PID, "Server ~w,", [ServerCount]),
   print_group_count(File_PID, GroupCount, 1, NumberOfGroups),
-  print_info(ServerDict, ServerList, File_PID, ServerCount+1, NumberOfServers, NumberOfGroups);
-print_info(ServerDict, ServerList, File_PID, ServerCount, NumberOfServers, NumberOfGroups) when ServerCount > NumberOfServers ->
-  io:format("Group info printed to csv file. ~n", []).
+  TempGroupList = FullGroupList ++ [GroupCount],
+  print_info(ServerDict, ServerList, File_PID, ServerCount+1, NumberOfServers, NumberOfGroups, TempGroupList);
+print_info(ServerDict, ServerList, File_PID, ServerCount, NumberOfServers, NumberOfGroups, GroupList) when ServerCount > NumberOfServers ->
+  io:format("Group info printed to csv file. ~n", []),
+  GroupList.
 
 print_group_count(File_PID, GroupCount, CountIndex, NumberOfGroups) when CountIndex =< NumberOfGroups ->
   GroupElement = lists:nth(CountIndex, GroupCount),
@@ -103,7 +126,7 @@ print_file_header(File_PID, GroupCount, NumberOfGroups) when GroupCount =< Numbe
   print_file_header(File_PID, GroupCount+1, NumberOfGroups);
 print_file_header(File_PID, GroupCount, NumberOfGroups) when GroupCount > NumberOfGroups ->
   io:fwrite(File_PID, "~n", []),
-  io:format("Header printed to file.", []).
+  io:format("Header printed to file.~n", []).
   
 get_second_element(GroupList, AppendList, ElementIndex) when ElementIndex =< length(GroupList) ->
   Element = lists:nth(ElementIndex, GroupList),
