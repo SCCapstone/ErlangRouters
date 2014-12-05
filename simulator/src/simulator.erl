@@ -4,12 +4,11 @@
 %% number of servers/clients based on what the overseer module wants
 %% to have spawned. Essentially, this module simulates clients pinging
 %% hosts in a cluster.
-%% @version 1.2
+%% @version 1.2.1
 %% @TODO Add functionality to account for server load capacity.
-%% Date Last Modified: 11/20/2014
+%% Date Last Modified: 12/05/14
 -module(simulator).
 -export([server/1,client/3,spawn_clients/5,spawn_servers/2, pick_random_server/1]).
--import(overseer, [dictionary/1]).
 
 %% ----------------------------------------------------------------------------
 %% @doc server(State).
@@ -49,7 +48,7 @@ client(Server_Address, Group, Dict_ID) ->
   %%client(Server_Address, Group, Dict_ID).
 
 %% ----------------------------------------------------------------------------
-%% @doc spawnClients(NumClients, ServerList).
+%% @doc spawn_clients(NumClients, ServerList).
 %% Spawns a number of clients equal to the number of clients (NumClients)
 %% that the overseer wants to spawn. The function recursively calls itself
 %% to spawn a client one by one until there are no clients left to spawn.
@@ -76,7 +75,7 @@ spawn_clients(0, ServerList, Dict_ID, Dictionary, NumberOfGroups) ->
   Dictionary.
 
 %% ----------------------------------------------------------------------------
-%% @doc spawnServers(NumServers, ServerList).
+%% @doc spawn_servers(NumServers, ServerList).
 %% Spawns a number of servers equal to the number of servers (NumServers)
 %% that the overseer wants to spawn. The function prints the number of 
 %% servers left to spawn, spawns a server with a certain PID, adds that
@@ -98,7 +97,7 @@ spawn_servers(0, ServerList) ->
   ServerList.
 
 %% ----------------------------------------------------------------------------
-%% @doc pickRandomServer(ServerList). 
+%% @doc pick_random_server(ServerList). 
 %% Takes in the list of all Server_PIDs spawned by the simulator and 
 %% returns a random Server_PID from ServerList.
 pick_random_server(ServerList) ->
