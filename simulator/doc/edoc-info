@@ -1,4 +1,0 @@
-%% encoding: UTF-8
-{application,simulator}.
-{packages,[]}.
-{modules,[simulator,simulator_app,simulator_sup]}.
