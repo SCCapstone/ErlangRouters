@@ -7,7 +7,7 @@
 %% @version 1.2
 %% @TODO Add functionality to enter NumberOfClients, NumberOfServers,
 %% and NumberOfGroups from the command line.
-%% Date Last Modified: 12/05/2014
+%% Date Last Modified: 02/09/2015
 
 -module(overseer).
 -export([main/0, store_keys/4, print_info/7, get_second_element/3, print_group_count/4,
@@ -59,6 +59,7 @@ main() ->
   
   %Sort the group list by use of the greedy algorithm.
   SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
+  %SortedGroupList = greedy:do_greedy(GroupList, ServerDict2, FilePID2, ServerCapacity, 2, 1),
   
   %Print file header for 'after.csv'.
   io:fwrite(FilePID2, "Servers,", []),
@@ -68,9 +69,9 @@ main() ->
   print_updated_clients(SortedGroupList, FilePID2, 1, NumberOfGroups),
   
   %Copy before.csv, after.csv to D3 directory from current directory.
-  file:copy("before.csv", "../../visualization/D3/before.csv"),
-  file:copy("after.csv", "../../visualization/D3/after.csv"),
-  io:format("before.csv, after.csv moved to ../../visualization/D3/~n", []),
+  file:copy("before.csv", "../docs/visualization/D3/before.csv"),
+  file:copy("after.csv", "../docs/visualization/D3/after.csv"),
+  io:format("before.csv, after.csv moved to ../docs/visualization/D3/~n", []),
   
   %Halt the overseer.
   init:stop().
