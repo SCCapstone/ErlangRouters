@@ -7,7 +7,7 @@
 %% @version 1.2
 %% @TODO Add functionality to enter NumberOfClients, NumberOfServers,
 %% and NumberOfGroups from the command line.
-%% Date Last Modified: 02/09/2015
+%% Date Last Modified: 02/10/2015
 
 -module(overseer).
 -export([main/0, store_keys/4, print_info/7, get_second_element/3, print_group_count/4,
@@ -19,10 +19,18 @@
 main() ->  
 
   %Initialize variables, processes.
-  NumberOfClients = 100,
-  NumberOfServers = 10,
-  NumberOfGroups = 7,
-  ServerCapacity = 10,
+  %NumberOfClients = 100,
+  {ok, [X]} = io:fread("Enter the number of clients> ", "~d"),
+  NumberOfClients = X,
+  %NumberOfServers = 10,
+  {ok, [Y]} = io:fread("Enter the number of servers> ", "~d"),
+  NumberOfServers = Y,
+  %NumberOfGroups = 7,
+  {ok, [Q]} = io:fread("Enter the number of groups> ", "~d"),
+  NumberOfGroups = Q,
+  %ServerCapacity = 10,
+  {ok, [K]} = io:fread("Enter the server capacity> ", "~d"),
+  ServerCapacity = K,
   TempServerList = [],
   TempServerDict = orddict:new(),
   Dict = orddict:new(),
