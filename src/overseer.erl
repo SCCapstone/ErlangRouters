@@ -66,8 +66,8 @@ main() ->
   %GroupList,
   
   %Sort the group list by use of the greedy algorithm.
-  SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
-  %SortedGroupList = greedy:do_greedy(GroupList, ServerDict2, FilePID2, ServerCapacity, 2, 1),
+  %SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
+  SortedGroupList = greedy:do_greedy(GroupList, ServerDict2, FilePID2, ServerCapacity, 2, 1),
   
   %Print file header for 'after.csv'.
   io:fwrite(FilePID2, "Servers,", []),
@@ -96,7 +96,7 @@ store_keys(ServerDict, ServerList, ListIndex, NumberOfServers) when ListIndex =<
   TempValue = orddict:fetch(Current_PID, TempServerDict),
   io:format("Value now stored in ServerDict: ~w~n", [TempValue]),
   store_keys(TempServerDict, ServerList, ListIndex+1, NumberOfServers);
-store_keys(TempServerDict, ServerList, 11, NumberOfServers) ->
+store_keys(TempServerDict, ServerList, ListIndex, NumberOfServers) ->
   io:format("Key storage complete.~n~n"),
   TempServerDict.
 
@@ -236,6 +236,8 @@ print_file_header(File_PID, GroupCount, NumberOfGroups) when GroupCount =< Numbe
 print_file_header(File_PID, GroupCount, NumberOfGroups) when GroupCount > NumberOfGroups ->
   io:fwrite(File_PID, "~n", []),
   io:format("Header printed to file.~n", []).
+
+
 
     
   
