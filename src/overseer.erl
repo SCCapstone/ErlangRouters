@@ -66,8 +66,8 @@ main() ->
   %GroupList,
   
   %Sort the group list by use of the greedy algorithm.
-  %SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
-  SortedGroupList = greedy:do_greedy(GroupList, ServerDict2, FilePID2, ServerCapacity, 2, 1),
+  SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
+  %SortedGroupList = greedy:do_greedy(GroupList, ServerDict2, FilePID2, ServerCapacity, 2, 1),
   
   %Print file header for 'after.csv'.
   io:fwrite(FilePID2, "Servers,", []),
