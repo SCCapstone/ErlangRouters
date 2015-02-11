@@ -4,7 +4,7 @@
 %%
 %% The functions needed for the simulation are imported from simulator.erl.
 %% The functions needed for the algorithm are imported from greedy.erl.
-%% @version 1.2
+%% @version 1.2.1
 %% @TODO Add functionality to enter NumberOfClients, NumberOfServers,
 %% and NumberOfGroups from the command line.
 %% Date Last Modified: 02/10/2015
@@ -66,8 +66,8 @@ main() ->
   %GroupList,
   
   %Sort the group list by use of the greedy algorithm.
-  SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
-  %SortedGroupList = greedy:do_greedy(GroupList, ServerDict2, FilePID2, ServerCapacity, 2, 1),
+  %SortedGroupList = greedy:reassign_clients(GroupList, ServerDict2, FilePID2, ServerCapacity, 2),
+  SortedGroupList = greedy:do_greedy(GroupList, ServerDict2, FilePID2, ServerCapacity, 1),
   
   %Print file header for 'after.csv'.
   io:fwrite(FilePID2, "Servers,", []),
@@ -236,8 +236,7 @@ print_file_header(File_PID, GroupCount, NumberOfGroups) when GroupCount =< Numbe
 print_file_header(File_PID, GroupCount, NumberOfGroups) when GroupCount > NumberOfGroups ->
   io:fwrite(File_PID, "~n", []),
   io:format("Header printed to file.~n", []).
-
-
+	
 
     
   
