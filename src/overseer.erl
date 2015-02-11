@@ -38,9 +38,9 @@ main() ->
   TempGroupList = [],
   
   %Start two processes for the input and output files of the demo.
-  OneFile = file:open("before.csv", write),
+  OneFile = file:open("before.csv", [write]),
   FilePID = element(2, OneFile),
-  TwoFile = file:open("after.csv", write),
+  TwoFile = file:open("after.csv", [write]),
   FilePID2 = element(2, TwoFile),
  
   Dict_ID = spawn(overseer, dictionary, [Dict]),
