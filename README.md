@@ -11,13 +11,8 @@ If you are reading this, then you should have downloaded the ErlangRouters Repos
 Within this repository you should see:
 
 * doc        [folder]
-
 * docs       [folder]
-
 * src        [folder]
-
 * .gitignore [file]
-
 * Makefile   [text file]
-
 * README.md  [text file] <- The file you are currently reading.
