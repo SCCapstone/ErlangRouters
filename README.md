@@ -10,14 +10,14 @@ If you are reading this, then you should have downloaded the ErlangRouters Repos
 
 Within this repository you should see:
 
-*doc        [folder]
+* doc        [folder]
 
-*docs       [folder]
+* docs       [folder]
 
-*src        [folder]
+* src        [folder]
 
-*.gitignore [file]
+* .gitignore [file]
 
-*Makefile   [text file]
+* Makefile   [text file]
 
-*README.md  [text file] <- The file you are currently reading.
+* README.md  [text file] <- The file you are currently reading.
