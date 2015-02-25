@@ -17,4 +17,4 @@ Within this repository you should see:
 ## Running the Simulator
 We will assume you are using a linux-based operating system.  
 * Step 1: Open a terminal and navigate to */ErangRouters/src
-* Step 2: cut a hol in the box
+* Step 2: To be continued.
