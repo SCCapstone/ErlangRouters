@@ -44,7 +44,7 @@ reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex
     when GroupListIndex =< length(GroupList) ->
     case GroupListIndex == GreedyIndex of 
         true ->
-            reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex+1, GreedyIndex)
+            reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex+1, GreedyIndex);
         false ->
             FirstServerList = lists:nth(GreedyIndex, GroupList),
             CurrentServerList = lists:nth(GroupListIndex, GroupList),
@@ -53,7 +53,7 @@ reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex
             MovedClients2 = lists:nth(2, MovedClients),
             TempList1 = change_element(GreedyIndex, GroupList, MovedClients1),
             TempList2 = change_element(GroupListIndex, TempList1, MovedClients2),
-            reassign_clients(TempList2, ServerDict, File_PID, ServerCapacity, GroupListIndex+1, GreedyIndex);
+            reassign_clients(TempList2, ServerDict, File_PID, ServerCapacity, GroupListIndex+1, GreedyIndex)
     end;
 reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex, GreedyIndex) ->
     io:format("Clients reassigned.~n"),
