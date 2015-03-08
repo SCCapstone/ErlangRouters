@@ -6,19 +6,24 @@
 %% Date Last Modified: 2/10/2015
 
 -module(greedy).
--export([do_greedy/5, reassign_clients/6, move_clients/3, change_element/3]).
+-export([do_greedy/4, reassign_clients/5, move_clients/3, change_element/3]).
 
 %% ----------------------------------------------------------------------------
 %% @doc do_greedy/5
 %% This function runs the function reassign_clients/5 recursively for every member
-%% of GroupList, which essentially runs our greedy algorithm locally for each 
+%% of GroupList, which essentially runs our greedy algorithm locally for each
 %% server in the cluster. The final modified list of load balanced clients is
 %% returned once every server has been accounted for (GroupList).
 
-do_greedy(GroupList, ServerDict, File_PID, ServerCapacity, GreedyIndex) when GreedyIndex =< length(GroupList) ->
-    TempGroupList = reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, 1, GreedyIndex),
-    do_greedy(TempGroupList, ServerDict, File_PID, ServerCapacity, GreedyIndex+1);
-do_greedy(GroupList, ServerDict, File_PID, ServerCapacity, GreedyIndex) ->
+do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex)
+    when GreedyIndex =< length(GroupList) ->
+    
+    TempGroupList = reassign_clients(GroupList, File_PID,
+        ServerCapacity, 1, GreedyIndex),
+    do_greedy(TempGroupList, File_PID, ServerCapacity, GreedyIndex+1);
+    
+do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex) ->
+    
     io:format("Greedy algorithm completed.~n"),
     GroupList.
 
@@ -34,17 +39,19 @@ do_greedy(GroupList, ServerDict, File_PID, ServerCapacity, GreedyIndex) ->
 %% recursively called to compare Server 1 to every other Server, one Server
 %% at a time. The function reassigns the clients by calling move_clients,
 %% which runs our greedy solution and returns both Server lists that have
-%% been changed in a list-tuple MovedClients. Then, the GroupList is 
-%% modified to account for these two changes by the use of the function 
+%% been changed in a list-tuple MovedClients. Then, the GroupList is
+%% modified to account for these two changes by the use of the function
 %% change_element. The function is then recursively called to take a look
 %% at the next Server in the list (Servers 2 through Server NumberOfServers).
 %% Once every Server in GroupList has been accounted for, reassign_clients
-%% returns the final version of GroupList. 
-reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex, GreedyIndex)
+%% returns the final version of GroupList.
+reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex,
+    GreedyIndex)
     when GroupListIndex =< length(GroupList) ->
-    case GroupListIndex == GreedyIndex of 
+    case GroupListIndex == GreedyIndex of
         true ->
-            reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex+1, GreedyIndex);
+            reassign_clients(GroupList, File_PID, ServerCapacity,
+                GroupListIndex+1, GreedyIndex);
         false ->
             FirstServerList = lists:nth(GreedyIndex, GroupList),
             CurrentServerList = lists:nth(GroupListIndex, GroupList),
@@ -53,9 +60,11 @@ reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex
             MovedClients2 = lists:nth(2, MovedClients),
             TempList1 = change_element(GreedyIndex, GroupList, MovedClients1),
             TempList2 = change_element(GroupListIndex, TempList1, MovedClients2),
-            reassign_clients(TempList2, ServerDict, File_PID, ServerCapacity, GroupListIndex+1, GreedyIndex)
+            reassign_clients(TempList2, File_PID, ServerCapacity,
+                GroupListIndex+1, GreedyIndex)
     end;
-reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex, GreedyIndex) ->
+reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex, 
+    GreedyIndex) ->
     io:format("Clients reassigned.~n"),
     GroupList.
 
@@ -75,38 +84,48 @@ reassign_clients(GroupList, ServerDict, File_PID, ServerCapacity, GroupListIndex
 %% value at that particular index is 0, then we know that the optimum solution
 %% has already been reached (no clients of a particular group ID are on the
 %% server that the greedy solution is trying to optimize) so we skip that
-%% index. Once every index of these group lists have been exhaused, the 
+%% index. Once every index of these group lists have been exhaused, the
 %% updated primary and secondary server group lists are returned in a list
 %% of size two [primary, secondary].
-move_clients(FirstServerList, CurrentServerList, Iterator) when Iterator =< length(FirstServerList) ->
-  FirstElement = lists:nth(Iterator, FirstServerList),
-  CurrentElement = lists:nth(Iterator, CurrentServerList),
-  if
-    (FirstElement =< CurrentElement) and (FirstElement =/= 0) ->
-      TempCurrentList = change_element(Iterator, CurrentServerList, 
-        FirstElement+CurrentElement),
-      TempFirstList = change_element(Iterator, FirstServerList, 
-        FirstElement-FirstElement),
-      move_clients(TempFirstList, TempCurrentList, Iterator+1);
-    (CurrentElement < FirstElement) and (FirstElement =/= 0) ->
-      TempFirstList = change_element(Iterator, FirstServerList, 
-        FirstElement+CurrentElement),
-      TempCurrentList = change_element(Iterator, CurrentServerList, 
-        CurrentElement-CurrentElement),
-      move_clients(TempFirstList, TempCurrentList, Iterator+1);
-    FirstElement == 0 ->
-      move_clients(FirstServerList, CurrentServerList, Iterator+1)
-  end;
+move_clients(FirstServerList, CurrentServerList, Iterator)
+    when Iterator =< length(FirstServerList) ->
+    
+    FirstElement = lists:nth(Iterator, FirstServerList),
+    CurrentElement = lists:nth(Iterator, CurrentServerList),
+    
+    case {FirstElement, CurrentElement} of
+    
+        {FirstElement, CurrentElement} 
+            when (FirstElement =< CurrentElement) and (FirstElement =/= 0) ->
+                TempCurrentList = change_element(Iterator, CurrentServerList,
+                    FirstElement+CurrentElement),
+                TempFirstList = change_element(Iterator, FirstServerList,
+                    FirstElement-FirstElement),
+                move_clients(TempFirstList, TempCurrentList, Iterator+1);
+            
+        {FirstElement, CurrentElement} 
+            when (CurrentElement < FirstElement) and (FirstElement =/= 0) ->
+                TempFirstList = change_element(Iterator, FirstServerList,
+                    FirstElement+CurrentElement),
+                TempCurrentList = change_element(Iterator, CurrentServerList,
+                    CurrentElement-CurrentElement),
+                move_clients(TempFirstList, TempCurrentList, Iterator+1);
+                
+        {FirstElement, CurrentElement} 
+            when FirstElement == 0 ->
+                move_clients(FirstServerList, CurrentServerList, Iterator+1)
+    end;
+    
 move_clients(FirstServerList, CurrentServerList, Iterator) ->
-  MovedClients = [FirstServerList, CurrentServerList],
-  MovedClients.
+    MovedClients = [FirstServerList, CurrentServerList],
+    MovedClients.
 
 %% ----------------------------------------------------------------------------
 %% @doc change_element/3
 %% This function replaces the element of a List at index Index with
 %% NewElement through list manipulation.
 %% change_element(Index, List, NewElement) -> List.
-change_element(1, [_|After], NewElement) -> 
-  [NewElement|After];
-change_element(I, [Before|After], NewElement) -> 
-  [Before|change_element(I-1, After, NewElement)].  
+change_element(1, [_|After], NewElement) ->
+    [NewElement|After];
+change_element(I, [Before|After], NewElement) ->
+    [Before|change_element(I-1, After, NewElement)].

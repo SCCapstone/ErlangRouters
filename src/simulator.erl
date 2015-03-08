@@ -8,7 +8,7 @@
 %% @TODO Add functionality to account for server load capacity.
 %% Date Last Modified: 12/05/14
 -module(simulator).
--export([server/1,client/3,spawn_clients/5,spawn_servers/2, pick_random_server/1]).
+-export([server/1,client/2,spawn_clients/2,spawn_servers/1, pick_random_server/1]).
 
 %% ----------------------------------------------------------------------------
 %% @doc server(State).
@@ -35,74 +35,64 @@ server(State) ->
 %% request and own process ID. The client recieves a message from the 
 %% server pinged letting the client know that it is now on the server with
 %% the server hit count.
-%%
-client(Server_Address, Group, Dict_ID) ->
+client(Server_Address, Group) ->
   Server_Address ! {request, self()},
   io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
   receive
     {hit_count, Number} ->
       io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
         [self(), Number, Group])
-  end,
-  Dict_ID ! {request, self(), Group, Server_Address}.
-  %%client(Server_Address, Group, Dict_ID).
+  end.
 
 %% ----------------------------------------------------------------------------
-%% @doc spawn_clients(NumClients, ServerList).
-%% Spawns a number of clients equal to the number of clients (NumClients)
-%% that the overseer wants to spawn. The function recursively calls itself
-%% to spawn a client one by one until there are no clients left to spawn.
-%% For each recursive call, a random Server_PID is chosen by the function
-%% pickRandomServer and a client is spawned with a random GroupID between
-%% 1 and 5 that will ping the server specified by that random Server_PID
-%% chosen. A timer is set to simulate the amount of time between client
-%% pings on a host and then the function is recursively called. Once there
-%% are no more clients to spawn, a message is printed to the console letting
-%% the user know that the spawning is done.
+%% @doc spawn_clients/2
+%% Spawns a number of clients equal to NumberOfClients. The function first
+%% selects a random Server_PID from server_list. Then, a Group_ID is randomly
+%% chosen between groups 1-NumberOfGroups. A {Client_PID, Server_PID, Group_ID}
+%% tuple is then inserted into the dictionary. A timer is run randomly between
+%% 1-100 ms to simulate the time in between clients joining a cluster. Once the
+%% timer is up, the next client is spawned.
 %%
-%% Note: while the clients are spawning, they are also being added to ServerDict,
-%% the ordered dictionary in Overseer that is keeping track of the servers and
-%% all their grouped clients.
-spawn_clients(NumClients, ServerList, Dict_ID, Dictionary, NumberOfGroups) when NumClients > 0 ->
-  Server_PID = pick_random_server(ServerList),
-  Group_ID = random:uniform(NumberOfGroups),
-  Client_PID = spawn(simulator,client,[Server_PID, Group_ID, Dict_ID]),
-  TempServerDict = orddict:append(Server_PID, {Client_PID, Group_ID}, Dictionary),
-  timer:sleep(random:uniform(100)),
-  spawn_clients(NumClients-1,ServerList, Dict_ID, TempServerDict, NumberOfGroups);
-spawn_clients(0, ServerList, Dict_ID, Dictionary, NumberOfGroups) ->
-  io:format("Last client spawned. ~n~n"),
-  Dictionary.
-
+%% Input: NumberOfClients- Number of Clients to be spawned by the function
+%%        NumberOfGroups- Number of different groups clients can be a part of
+%% Output: None.
+spawn_clients(NumberOfClients, NumberOfGroups) when NumberOfClients > 0 ->
+    ServerList = ets:tab2list(server_list),
+    Server_PID = pick_random_server(ServerList),
+    Group_ID = random:uniform(NumberOfGroups),
+    Client_PID = spawn(simulator,client,[Server_PID, Group_ID]),
+    ets:insert(dictionary, {Client_PID, Server_PID, Group_ID}),
+    timer:sleep(random:uniform(100)),
+    spawn_clients(NumberOfClients-1, NumberOfGroups);
+spawn_clients(0, NumberOfGroups) ->
+    io:format("Last client spawned. ~n~n").
+  
 %% ----------------------------------------------------------------------------
-%% @doc spawn_servers(NumServers, ServerList).
-%% Spawns a number of servers equal to the number of servers (NumServers)
-%% that the overseer wants to spawn. The function prints the number of 
-%% servers left to spawn, spawns a server with a certain PID, adds that
-%% PID to a temporary list and prints it, and recursively calls the 
-%% function with the parameters (NumServers-1, ServerList+PIDlist).
-%% When there are no servers left to spawn, a message is printed to the
-%% console letting the user know that all the servers have spawned and
-%% ServerList, the list of the Server_PIDs from every server spawned,
-%% is returned. 
-spawn_servers(NumServers, ServerList) when NumServers > 0 ->
-  io:format("Number of servers left to spawn: ~w~n", [NumServers]),
-  Server_PID = spawn(simulator, server, [0]),
-  PIDlist = [Server_PID],
-  io:format("Server ~w spawned.~n", [Server_PID]),
-  TempServerList = ServerList ++ PIDlist,
-  spawn_servers(NumServers-1, TempServerList);   
-spawn_servers(0, ServerList) -> 
-  io:format("~nAll servers spawned.~n~n"),
-  ServerList.
+%% @doc spawn_servers(NumberOfServers).
+%% Spawns a number of server processes equal to NumberOfServers. A server is
+%% spawned, with a Server_PID of the process recorded. That Server_PID is then
+%% inserted into the server_list. Servers are spawned until the NumberOfServers
+%% left to spawn is 0.
+%%
+%% Input: NumberOfServers- the number of servers to be spawned
+%% Ouput: None 
+spawn_servers(NumberOfServers) when NumberOfServers > 0 ->
+    io:format("Number of servers left to spawn: ~w~n", [NumberOfServers]),
+    Server_PID = spawn(simulator, server, [0]),
+    ets:insert(server_list, {Server_PID}),
+    io:format("Server ~w spawned.~n", [Server_PID]),
+    spawn_servers(NumberOfServers-1);   
+spawn_servers(0) -> 
+    io:format("~nAll servers spawned.~n~n").
 
 %% ----------------------------------------------------------------------------
 %% @doc pick_random_server(ServerList). 
 %% Takes in the list of all Server_PIDs spawned by the simulator and 
 %% returns a random Server_PID from ServerList.
 pick_random_server(ServerList) ->
-  ListIndex = random:uniform(length(ServerList)),
-  Server_PID = lists:nth(ListIndex, ServerList),
-  Server_PID.
+    ListIndex = random:uniform(length(ServerList)),
+    ServerTuple = lists:nth(ListIndex, ServerList),
+    Server_PID = element(1, ServerTuple),
+    Server_PID.
 
 
