@@ -8,7 +8,7 @@
 %% @TODO Add functionality to account for server load capacity.
 %% Date Last Modified: 12/05/14
 -module(simulator).
--export([server/1,client/2,spawn_clients/2,spawn_servers/1, pick_random_server/1]).
+-export([server/2,client/2,spawn_clients/2,spawn_servers/2, pick_random_server/1]).
 
 %% ----------------------------------------------------------------------------
 %% @doc server(State).
@@ -17,14 +17,14 @@
 %% request from a client, it accepts the client and sends a message back
 %% to the client with the current hit count of the server and then the
 %% server function is recursively called.
-server(State) ->
+server(State, ServerCapacity) ->
   receive 
     {request, Return_PID} ->
       io:format("Server ~w: Client request received from ~w~n",
         [self(), Return_PID]),
       NewState = State + 1,
       Return_PID ! {hit_count, NewState},
-      server(NewState)
+      server(NewState, ServerCapacity)
   end.
   
 %% ----------------------------------------------------------------------------  
@@ -68,7 +68,7 @@ spawn_clients(0, NumberOfGroups) ->
     io:format("Last client spawned. ~n~n").
   
 %% ----------------------------------------------------------------------------
-%% @doc spawn_servers(NumberOfServers).
+%% @doc spawn_servers(NumberOfServers, ServerCapacity).
 %% Spawns a number of server processes equal to NumberOfServers. A server is
 %% spawned, with a Server_PID of the process recorded. That Server_PID is then
 %% inserted into the server_list. Servers are spawned until the NumberOfServers
@@ -76,13 +76,13 @@ spawn_clients(0, NumberOfGroups) ->
 %%
 %% Input: NumberOfServers- the number of servers to be spawned
 %% Ouput: None 
-spawn_servers(NumberOfServers) when NumberOfServers > 0 ->
+spawn_servers(NumberOfServers, ServerCapacity) when NumberOfServers > 0 ->
     io:format("Number of servers left to spawn: ~w~n", [NumberOfServers]),
-    Server_PID = spawn(simulator, server, [0]),
+    Server_PID = spawn(simulator, server, [0, ServerCapacity]),
     ets:insert(server_list, {Server_PID}),
     io:format("Server ~w spawned.~n", [Server_PID]),
-    spawn_servers(NumberOfServers-1);   
-spawn_servers(0) -> 
+    spawn_servers(NumberOfServers-1, ServerCapacity);   
+spawn_servers(0, ServerCapacity) -> 
     io:format("~nAll servers spawned.~n~n").
 
 %% ----------------------------------------------------------------------------

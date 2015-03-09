@@ -12,7 +12,8 @@
 -module(overseer).
 -export([main/0, print_info/5, get_second_element/3, print_group_count/4,
  print_file_header/3, count_groups/4, get_num_clients/4, print_updated_clients/4,
- get_matched_clients/1]).
+ get_matched_clients/1, master_server/0, handle_client_movement/3, 
+ insert_new_client/4]).
 
 %% ----------------------------------------------------------------------------
 %% @doc main().
@@ -29,15 +30,14 @@ main() ->
     NumberOfGroups = 5,
     %{ok, [Q]} = io:fread("Enter the number of groups> ", "~d"),
     %NumberOfGroups = Q,
-    ServerCapacity = 100,
+    ServerCapacity = 10,
     %{ok, [K]} = io:fread("Enter the server capacity> ", "~d"),
     %ServerCapacity = K,
   
-    %ets:rd(server_list, {Server_PID}),
     ets:new(server_list, [ordered_set, named_table, public]),
     ets:new(dictionary, [ordered_set, {keypos,1}, named_table, public]),
     
-    simulator:spawn_servers(NumberOfServers),
+    simulator:spawn_servers(NumberOfServers, ServerCapacity),
     simulator:spawn_clients(NumberOfClients, NumberOfGroups),
   
     %Start two processes for the input and output files of the demo.
@@ -53,24 +53,36 @@ main() ->
     %Print ServerDict to 'before.csv', populating GroupList at the same time.
     GroupList = print_info(FilePID, 1, NumberOfServers, NumberOfGroups, []),
   
+    io:format("Dictionary to list before: ~w~n", [ets:tab2list(dictionary)]),
     %Sort the group list by use of the greedy algorithm.
     SortedGroupList = greedy:do_greedy(GroupList, FilePID2, ServerCapacity, 1),
-  
+    io:format("Dictionary to list after: ~w~n", [ets:tab2list(dictionary)]),
     %Print file header for 'after.csv'.
     io:fwrite(FilePID2, "Servers,", []),
     print_file_header(FilePID2, 1, NumberOfGroups),
   
     %Print updated client information to 'after.csv'.
     print_updated_clients(SortedGroupList, FilePID2, 1, NumberOfGroups),
-  
+    
+    file:delete("../docs/visualization/D3/before.csv"),
+    file:delete("../docs/visualization/D3/after.csv"),
+    
     %Copy before.csv, after.csv to D3 directory from current directory.
     file:copy("before.csv", "../docs/visualization/D3/before.csv"),
     file:copy("after.csv", "../docs/visualization/D3/after.csv"),
-    io:format("before.csv, after.csv moved to ../docs/visualization/D3/~n", []),
+    
+    %Delete csv files in current directory.
+    file:delete("before.csv"),
+    file:delete("after.csv"),
   
     %Halt the overseer.
     init:stop().
 
+master_server() ->
+    receive
+        {print_group_data, GroupList} ->
+            master_server()
+    end.
 %% ----------------------------------------------------------------------------
 %% @doc print_updated_clients/4
 %% This function prints the second, updated list of server GroupLists to
@@ -111,13 +123,9 @@ print_info(File_PID, ServerCount, NumberOfServers, NumberOfGroups, FullGroupList
 
     ServerList = ets:tab2list(server_list),
     Server_PID = element(1,lists:nth(ServerCount, ServerList)),
-    io:format("Server_PID in printInfo: ~w~n", [Server_PID]),
     ClientList = overseer:get_matched_clients(Server_PID),
-    io:format("ClientList in printInfo: ~w~n", [ClientList]),
     GroupList = get_second_element(ClientList, [], 1),
-    io:format("GroupList in printInfo: ~w~n", [GroupList]),
     GroupCount = count_groups(GroupList, [], NumberOfGroups, 1),
-    io:format("GroupCount in printInfo: ~w~n", [GroupCount]),
     io:fwrite(File_PID, "Server ~w,", [ServerCount]),
     print_group_count(File_PID, GroupCount, 1, NumberOfGroups),
     TempGroupList = FullGroupList ++ [GroupCount],
@@ -126,7 +134,6 @@ print_info(File_PID, ServerCount, NumberOfServers, NumberOfGroups, FullGroupList
 print_info(File_PID, ServerCount, NumberOfServers, NumberOfGroups, GroupList) 
     when ServerCount > NumberOfServers ->
     
-    io:format("Group info printed to csv file. ~n", []),
     GroupList.
 
 %% ----------------------------------------------------------------------------
@@ -139,11 +146,48 @@ print_info(File_PID, ServerCount, NumberOfServers, NumberOfGroups, GroupList)
 %% Input: Server_PID- Server_PID to be matched.
 %% Output: ClientMatches- List of lists, where each element is a match in the dictionary
 %% to the particular Server_PID input.
-%% 
-%% 
 get_matched_clients(Server_PID) -> 
     ClientMatches = ets:select(dictionary, [{{'$1',Server_PID,'$3'},[],['$$']}]),
     ClientMatches.
+
+%% ----------------------------------------------------------------------------
+%% @doc handle_client_movement/3
+%% Updates dictionary by moving all clients from RemovalServer_PID in group Group_ID
+%% to AdditionServer_PID.
+%%
+%% Input: RemovalServer_PID- server clients are being removed from.
+%%        AdditionServer_PID- server clients are being added to.
+%%        Group_ID- group ID number of clients that are being moved.
+%% Output: None.
+handle_client_movement(RemovalServer_PID, AdditionServer_PID, Group_ID) ->
+    ClientsMoved = ets:select(dictionary, [{{'$1', RemovalServer_PID, Group_ID}, 
+        [], ['$$']}]),
+    io:format("ZORK: ~w~n", [ClientsMoved]),
+    insert_new_client(ClientsMoved, AdditionServer_PID, Group_ID, 1).
+
+%% ----------------------------------------------------------------------------
+%% @doc insert_new_client/4
+%% Takes in a list of clients that need to be moved to server AdditionServer_PID.
+%% This list, ClientList, is iterated through ClientIndex number of times. For
+%% each iteration, a {Client_PID, AdditionServer_PID, Group_ID} tuple is inserted
+%% into the dictionary. Because the dictionary is an ordered_set, the previous
+%% entry for Client_PID is replaced with the new entry.
+%%
+%% Input: ClientList- List of clients that need to be moved.
+%%        AdditionServer_PID- server clients are being added to.
+%%        Group_ID- group ID number of clients that are being moved.
+%%        ClientIndex- iterator for the ClientList.
+%% Output: None.
+insert_new_client(ClientList, AdditionServer_PID, Group_ID, ClientIndex) ->
+    case ClientIndex =< length(ClientList) of
+        true ->
+            Client_PID = lists:nth(1, lists:nth(ClientIndex, ClientList)),
+            ets:insert(dictionary, {Client_PID, AdditionServer_PID, Group_ID}),
+            insert_new_client(ClientList, AdditionServer_PID, Group_ID, 
+                ClientIndex+1);
+        false ->
+            ok
+    end.
     
 %% ----------------------------------------------------------------------------
 %% @doc get_second_element/3
@@ -152,7 +196,6 @@ get_matched_clients(Server_PID) ->
 %% by using recursion to grab the second element of every element in 
 %% GroupList, add that to TempList, which is a 'running count' of the
 %% elements, then returns TempList once GroupList has been exhausted.
-%% 
 get_second_element(GroupList, AppendList, ElementIndex) 
     when ElementIndex =< length(GroupList) ->
     
@@ -173,14 +216,13 @@ get_second_element(GroupList, TempList, ElementIndex)
 %% [#Clients in Group 1, .., #Clients in Group NumberOfGroups]. Uses
 %% the function get_num_clients to get the value of the number of instances
 %% of a particular Group ID in GroupList.
-%%   
 count_groups(GroupList, RunningCount, NumberOfGroups, GroupIndex) 
     when GroupIndex =< NumberOfGroups ->
   
     NumClientsInGroup = [get_num_clients(GroupList, GroupIndex, 0, 1)],
-    io:format("NumClientsInGroup in countGroups: ~w~n", [NumClientsInGroup]),
     ActualRunningCount = RunningCount ++ NumClientsInGroup,
     count_groups(GroupList, ActualRunningCount, NumberOfGroups, GroupIndex+1);
+    
 count_groups(GroupList, ActualRunningCount, NumberOfGroups, GroupIndex) 
     when GroupIndex > NumberOfGroups ->
     
@@ -191,42 +233,42 @@ count_groups(GroupList, ActualRunningCount, NumberOfGroups, GroupIndex)
 %% Prints the list GroupCount to the file represented by the process identifier
 %% File_PID in a format properly recognized by D3. For the purposes of our demo,
 %% the type of file being printed to is a csv file.
-%% 
 print_group_count(File_PID, GroupCount, CountIndex, NumberOfGroups) 
     when CountIndex =< NumberOfGroups ->
     
     GroupElement = lists:nth(CountIndex, GroupCount),
-    if
-    CountIndex =< NumberOfGroups-1 ->
-      io:fwrite(File_PID, "~w,", [GroupElement]);
-    CountIndex == NumberOfGroups ->
-      io:fwrite(File_PID, "~w", [GroupElement])
+    
+    case CountIndex =< NumberOfGroups-1 of
+        true->
+            io:fwrite(File_PID, "~w,", [GroupElement]);
+        false ->
+            io:fwrite(File_PID, "~w", [GroupElement])
     end,
+    
     print_group_count(File_PID, GroupCount, CountIndex+1, NumberOfGroups);
 
 print_group_count(File_PID, GroupCount, CountIndex, NumberOfGroups) 
     when CountIndex > NumberOfGroups ->
     
-    io:fwrite(File_PID, "~n", []),
-    io:format("Correct formatted GroupCount added to file~n", []).
+    io:fwrite(File_PID, "~n", []).
 
 %% ----------------------------------------------------------------------------
 %% @doc get_num_clients/4
 %% For a particular GroupID value, this function sweeps through GroupList
 %% and counts the number of times that that value appears in GroupList. This
 %% is returned by the function by NewNumClients.
-%%  
 get_num_clients(GroupList, GroupIndex, NumClients, GroupListIndex) 
     when GroupListIndex =< length(GroupList) ->
   
     GroupNum = lists:nth(GroupListIndex, GroupList),
-    io:format("GroupNum in getNumClients: ~w~n", [GroupNum]),
-    if
-    GroupNum == GroupIndex ->
-      NewNumClients = NumClients + 1;
-    GroupNum =/= GroupIndex ->
-      NewNumClients = NumClients
+    
+    case GroupNum == GroupIndex of
+        true ->
+            NewNumClients = NumClients + 1;
+        false ->
+            NewNumClients = NumClients
     end,
+    
     get_num_clients(GroupList, GroupIndex, NewNumClients, GroupListIndex+1);
 
 get_num_clients(GroupList, GroupIndex, NewNumClients, GroupListIndex) 
@@ -237,22 +279,21 @@ get_num_clients(GroupList, GroupIndex, NewNumClients, GroupListIndex)
 %% @doc print_file_header/3
 %% Prints the properly formatted group labels to the csv file represented by the
 %% process identifier File_PID.
-%% 
 print_file_header(File_PID, GroupCount, NumberOfGroups) 
     when GroupCount =< NumberOfGroups ->
   
-    if
-    GroupCount =< NumberOfGroups-1 ->
-      io:fwrite(File_PID, "Group ~w,", [GroupCount]);
-    GroupCount == NumberOfGroups ->
-      io:fwrite(File_PID, "Group ~w", [GroupCount])
+    case GroupCount =< NumberOfGroups-1 of
+        true ->
+            io:fwrite(File_PID, "Group ~w,", [GroupCount]);
+        false ->
+            io:fwrite(File_PID, "Group ~w", [GroupCount])
     end,
+    
     print_file_header(File_PID, GroupCount+1, NumberOfGroups);
 
 print_file_header(File_PID, GroupCount, NumberOfGroups) 
     when GroupCount > NumberOfGroups ->
-    io:fwrite(File_PID, "~n", []),
-    io:format("Header printed to file.~n", []).
+    io:fwrite(File_PID, "~n", []).
     
 
     
