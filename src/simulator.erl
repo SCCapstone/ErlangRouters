@@ -18,14 +18,25 @@
 %% to the client with the current hit count of the server and then the
 %% server function is recursively called.
 server(State, ServerCapacity) ->
-  receive 
-    {request, Return_PID} ->
-      io:format("Server ~w: Client request received from ~w~n",
-        [self(), Return_PID]),
-      NewState = State + 1,
-      Return_PID ! {hit_count, NewState},
-      server(NewState, ServerCapacity)
-  end.
+    receive
+		{request, Return_PID, Group_ID} ->
+			case State < ServerCapacity of
+				true ->
+					io:format("Server ~w: Client request received from ~w~n",
+						[self(), Return_PID]),
+					NewState = State + 1,
+					ets:insert(dictionary, {Return_PID, self(), Group_ID}),
+					Return_PID ! {hit_count, NewState},
+					server(NewState, ServerCapacity);
+				false ->
+					io:format("Server ~w full.~n", [self()]),
+					Return_PID ! {server_full},
+					server(State, ServerCapacity)
+			end;
+		{capacity_request, Return_PID} ->
+			Return_PID ! {server_capacity, State, ServerCapacity},
+			server(State, ServerCapacity)
+	end.
   
 %% ----------------------------------------------------------------------------  
 %% @doc client(Server_Address).
@@ -36,13 +47,21 @@ server(State, ServerCapacity) ->
 %% server pinged letting the client know that it is now on the server with
 %% the server hit count.
 client(Server_Address, Group) ->
-  Server_Address ! {request, self()},
-  io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
-  receive
-    {hit_count, Number} ->
-      io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
-        [self(), Number, Group])
-  end.
+	Server_Address ! {request, self(), Group},
+	io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
+	receive
+		{hit_count, Number} ->
+			io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
+				[self(), Number, Group]);
+		{server_full} ->
+			Master_PID = whereis(master_server),
+			Master_PID ! {nonfull_server_request, self()},
+			receive
+				{new_server_pid, NewServer_PID} ->
+					client(NewServer_PID, Group)
+			end
+		
+	end.
 
 %% ----------------------------------------------------------------------------
 %% @doc spawn_clients/2
@@ -60,8 +79,7 @@ spawn_clients(NumberOfClients, NumberOfGroups) when NumberOfClients > 0 ->
     ServerList = ets:tab2list(server_list),
     Server_PID = pick_random_server(ServerList),
     Group_ID = random:uniform(NumberOfGroups),
-    Client_PID = spawn(simulator,client,[Server_PID, Group_ID]),
-    ets:insert(dictionary, {Client_PID, Server_PID, Group_ID}),
+    spawn(simulator,client,[Server_PID, Group_ID]),
     timer:sleep(random:uniform(100)),
     spawn_clients(NumberOfClients-1, NumberOfGroups);
 spawn_clients(0, NumberOfGroups) ->

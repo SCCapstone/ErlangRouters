@@ -11,58 +11,47 @@
 
 -module(overseer).
 -export([main/0, print_info/5, get_second_element/3, print_group_count/4,
- print_file_header/3, count_groups/4, get_num_clients/4, print_updated_clients/4,
- get_matched_clients/1, master_server/0, handle_client_movement/3, 
- insert_new_client/4]).
-
+ print_file_header/3, count_groups/4, get_num_clients/4, 
+ print_updated_clients/4, get_matched_clients/1, master_server/1,
+ handle_client_movement/3, insert_new_client/4, get_group_list/4, 
+ load_balancer/4, print_group_list/4, spawn_files/0]).
+ 
 %% ----------------------------------------------------------------------------
-%% @doc main().
+%% @doc main/0
 %%
 main() ->  
 
     %Initialize variables, processes.
-    NumberOfClients = 25,
-    %{ok, [X]} = io:fread("Enter the number of clients> ", "~d"),
-    %NumberOfClients = X,
-    NumberOfServers = 5,
-    %{ok, [Y]} = io:fread("Enter the number of servers> ", "~d"),
-    %NumberOfServers = Y,
-    NumberOfGroups = 5,
-    %{ok, [Q]} = io:fread("Enter the number of groups> ", "~d"),
-    %NumberOfGroups = Q,
-    ServerCapacity = 10,
-    %{ok, [K]} = io:fread("Enter the server capacity> ", "~d"),
-    %ServerCapacity = K,
-  
+    {ok, [X]} = io:fread("Enter the number of clients> ", "~d"),
+    NumberOfClients = X,
+    {ok, [Y]} = io:fread("Enter the number of servers> ", "~d"),
+    NumberOfServers = Y,
+    {ok, [Q]} = io:fread("Enter the number of groups> ", "~d"),
+    NumberOfGroups = Q,
+    {ok, [K]} = io:fread("Enter the server capacity> ", "~d"),
+    ServerCapacity = K,
+    {ok, [Alg]} = io:fread("Enter the algorithm you wish to use for the 
+		simulation (greedy or firstworst)> ", "~s"),
+	Algorithm = Alg,
+	
+    register(master_server, spawn(overseer, master_server, [NumberOfGroups])),
+    
     ets:new(server_list, [ordered_set, named_table, public]),
     ets:new(dictionary, [ordered_set, {keypos,1}, named_table, public]),
     
+    spawn_files(),
+    
     simulator:spawn_servers(NumberOfServers, ServerCapacity),
     simulator:spawn_clients(NumberOfClients, NumberOfGroups),
-  
-    %Start two processes for the input and output files of the demo.
-    OneFile = file:open("before.csv", [write]),
-    FilePID = element(2, OneFile),
-    TwoFile = file:open("after.csv", [write]),
-    FilePID2 = element(2, TwoFile),
-  
-    %Print file header for 'before.csv'.
-    io:fwrite(FilePID, "Servers,", []),
-    print_file_header(FilePID, 1, NumberOfGroups),
-  
-    %Print ServerDict to 'before.csv', populating GroupList at the same time.
-    GroupList = print_info(FilePID, 1, NumberOfServers, NumberOfGroups, []),
-  
-    io:format("Dictionary to list before: ~w~n", [ets:tab2list(dictionary)]),
-    %Sort the group list by use of the greedy algorithm.
-    SortedGroupList = greedy:do_greedy(GroupList, FilePID2, ServerCapacity, 1),
-    io:format("Dictionary to list after: ~w~n", [ets:tab2list(dictionary)]),
-    %Print file header for 'after.csv'.
-    io:fwrite(FilePID2, "Servers,", []),
-    print_file_header(FilePID2, 1, NumberOfGroups),
-  
-    %Print updated client information to 'after.csv'.
-    print_updated_clients(SortedGroupList, FilePID2, 1, NumberOfGroups),
+    
+    io:fwrite(whereis(before), "Servers,", []),
+    print_file_header(whereis(before), 1, NumberOfGroups),
+    AltGroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
+    print_group_list(whereis(before), AltGroupList, 1, NumberOfGroups),
+    load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
+		Algorithm),
+    
+    timer:sleep(5000),
     
     file:delete("../docs/visualization/D3/before.csv"),
     file:delete("../docs/visualization/D3/after.csv"),
@@ -74,15 +63,67 @@ main() ->
     %Delete csv files in current directory.
     file:delete("before.csv"),
     file:delete("after.csv"),
-  
+	
     %Halt the overseer.
     init:stop().
 
-master_server() ->
+master_server(NumberOfGroups) ->
     receive
-        {print_group_data, GroupList} ->
-            master_server()
+        {print_group_list, GroupList} ->
+			File_PID = whereis(notbefore),
+			io:fwrite(File_PID, "Servers,", []),
+			print_file_header(File_PID, 1, NumberOfGroups),
+			print_group_list(File_PID, GroupList, 1, NumberOfGroups),
+            master_server(NumberOfGroups);
+            
+        {nonfull_server_request, Return_PID} ->
+            ServerList = ets:tab2list(server_list),
+            NewServer_PID = simulator:pick_random_server(ServerList),
+            Return_PID ! {new_server_pid, NewServer_PID},
+            master_server(NumberOfGroups);
+            
+        {fullfil_capacity_request, Request_PID, Return_PID} ->
+            Request_PID ! {capacity_request, self()},
+            receive
+                {server_capacity, State, ServerCapacity} ->
+                    SpaceLeft = ServerCapacity - State,
+                    Return_PID ! {space_left, SpaceLeft},
+                    master_server(NumberOfGroups)
+            end;
+        
+        {check_server, Request_PID, Return_PID} ->
+			io:format("Master_server got message ~n"),
+			Request_PID ! {capacity_request, self()},
+		
+			receive
+                {server_capacity, State, ServerCapacity} ->
+                    SpaceLeft = ServerCapacity - State,
+                    Return_PID ! {space_left, SpaceLeft},
+                    master_server(NumberOfGroups)
+            end
     end.
+    
+load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
+	Algorithm) ->
+	File_PID = whereis(notbefore),
+	GroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
+	
+	case {Algorithm} of
+		{Algorithm} when Algorithm =:= "greedy" ->
+			spawn(greedy, do_greedy, [GroupList, File_PID, ServerCapacity, 1,
+				now()]);
+		{Algorithm} when Algorithm =:= "firstworst" ->
+			ok
+	end.
+    
+spawn_files() ->
+	OneFile = file:open("before.csv", [write]),
+    FilePID = element(2, OneFile),
+    register(before, FilePID),
+    TwoFile = file:open("after.csv", [write]),
+    AnotherPID = element(2, TwoFile),
+    register(notbefore, AnotherPID).
+    
 %% ----------------------------------------------------------------------------
 %% @doc print_updated_clients/4
 %% This function prints the second, updated list of server GroupLists to
@@ -136,6 +177,33 @@ print_info(File_PID, ServerCount, NumberOfServers, NumberOfGroups, GroupList)
     
     GroupList.
 
+print_group_list(File_PID, GroupList, GroupListIterator, NumberOfGroups) ->
+    case GroupListIterator =< length(GroupList) of
+        true ->
+            GroupListElement = lists:nth(GroupListIterator, GroupList),
+            io:fwrite(File_PID, "Server ~w,", [GroupListIterator]),
+            print_group_count(File_PID, GroupListElement, 1, NumberOfGroups),
+            print_group_list(File_PID, GroupList, GroupListIterator+1, 
+				NumberOfGroups);
+        false ->
+            ok
+    end.
+    
+get_group_list(NumberOfGroups, NumberOfServers, GroupList, GroupListIterator) ->
+    case GroupListIterator =< NumberOfServers of
+        true ->
+            ServerList = ets:tab2list(server_list),
+            Server_PID = element(1, lists:nth(GroupListIterator, ServerList)),
+            ClientList = overseer:get_matched_clients(Server_PID),
+            GroupCount = get_second_element(ClientList, [], 1),
+            GroupListElement = count_groups(GroupCount, [], NumberOfGroups, 1),
+            NewGroupList = GroupList ++ [GroupListElement],
+            get_group_list(NumberOfGroups, NumberOfServers, NewGroupList, 
+                GroupListIterator+1);
+        false ->
+            GroupList
+    end.
+
 %% ----------------------------------------------------------------------------
 %% @doc get_matched_clients/1
 %% Returns the a list of lists ClientMatches, [[Client_PID, Group_ID]], in which each 
@@ -162,7 +230,6 @@ get_matched_clients(Server_PID) ->
 handle_client_movement(RemovalServer_PID, AdditionServer_PID, Group_ID) ->
     ClientsMoved = ets:select(dictionary, [{{'$1', RemovalServer_PID, Group_ID}, 
         [], ['$$']}]),
-    io:format("ZORK: ~w~n", [ClientsMoved]),
     insert_new_client(ClientsMoved, AdditionServer_PID, Group_ID, 1).
 
 %% ----------------------------------------------------------------------------
@@ -203,10 +270,8 @@ get_second_element(GroupList, AppendList, ElementIndex)
     GroupNumber = [lists:nth(2, Element)],
     TempList = AppendList ++ GroupNumber,
     get_second_element(GroupList, TempList, ElementIndex+1);
-
 get_second_element(GroupList, TempList, ElementIndex) 
     when ElementIndex > length(GroupList) ->
-    
     TempList.
 
 %% ----------------------------------------------------------------------------
@@ -222,10 +287,8 @@ count_groups(GroupList, RunningCount, NumberOfGroups, GroupIndex)
     NumClientsInGroup = [get_num_clients(GroupList, GroupIndex, 0, 1)],
     ActualRunningCount = RunningCount ++ NumClientsInGroup,
     count_groups(GroupList, ActualRunningCount, NumberOfGroups, GroupIndex+1);
-    
 count_groups(GroupList, ActualRunningCount, NumberOfGroups, GroupIndex) 
     when GroupIndex > NumberOfGroups ->
-    
     ActualRunningCount.
   
 %% ----------------------------------------------------------------------------
@@ -246,10 +309,8 @@ print_group_count(File_PID, GroupCount, CountIndex, NumberOfGroups)
     end,
     
     print_group_count(File_PID, GroupCount, CountIndex+1, NumberOfGroups);
-
 print_group_count(File_PID, GroupCount, CountIndex, NumberOfGroups) 
     when CountIndex > NumberOfGroups ->
-    
     io:fwrite(File_PID, "~n", []).
 
 %% ----------------------------------------------------------------------------
@@ -270,7 +331,6 @@ get_num_clients(GroupList, GroupIndex, NumClients, GroupListIndex)
     end,
     
     get_num_clients(GroupList, GroupIndex, NewNumClients, GroupListIndex+1);
-
 get_num_clients(GroupList, GroupIndex, NewNumClients, GroupListIndex) 
     when GroupListIndex > length(GroupList) -> 
     NewNumClients.
@@ -281,7 +341,7 @@ get_num_clients(GroupList, GroupIndex, NewNumClients, GroupListIndex)
 %% process identifier File_PID.
 print_file_header(File_PID, GroupCount, NumberOfGroups) 
     when GroupCount =< NumberOfGroups ->
-  
+    
     case GroupCount =< NumberOfGroups-1 of
         true ->
             io:fwrite(File_PID, "Group ~w,", [GroupCount]);
@@ -290,7 +350,6 @@ print_file_header(File_PID, GroupCount, NumberOfGroups)
     end,
     
     print_file_header(File_PID, GroupCount+1, NumberOfGroups);
-
 print_file_header(File_PID, GroupCount, NumberOfGroups) 
     when GroupCount > NumberOfGroups ->
     io:fwrite(File_PID, "~n", []).
