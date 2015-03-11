@@ -3,25 +3,32 @@
 %% and manages the algorithm for load balancing the groups on the servers.
 %%
 %% The functions needed for the simulation are imported from simulator.erl.
-%% The functions needed for the algorithm are imported from greedy.erl.
-%% @version 1.2.1
-%% @TODO Add functionality to enter NumberOfClients, NumberOfServers,
-%% and NumberOfGroups from the command line.
-%% Date Last Modified: 02/10/2015
+%% The functions needed for the algorithm are imported from greedy.erl/
+%%     firstworst.erl.
+%% @version 1.3
+%% @TODO Add health_check server functionality.
 
 -module(overseer).
--export([main/0, print_info/5, get_second_element/3, print_group_count/4,
+-export([main/0, get_second_element/3, print_group_count/4,
  print_file_header/3, count_groups/4, get_num_clients/4, 
- print_updated_clients/4, get_matched_clients/1, master_server/1,
- handle_client_movement/3, insert_new_client/4, get_group_list/4, 
+ get_matched_clients/1, master_server/1,
+ handle_client_movement/4, insert_new_client/4, get_group_list/4, 
  load_balancer/4, print_group_list/4, spawn_files/0]).
  
 %% ----------------------------------------------------------------------------
 %% @doc main/0
-%%
+%% Takes in user input for the number of clients, number of servers, number of
+%% groups, server capacity, and which algorithm is to be used by the simulator.
+%% Spawns and registers the master_server. Creates an ets server_list to hold
+%% the PIDs of the servers spawned by the simulation and an ets dictionary to
+%% hold the {Client_PID, Server_PID, Group_ID} tuples to keep track of the 
+%% clients. Spawns the output files. Spawns servers and clients. Prints
+%% initial GroupList to output. Calls load_balancer/4, which runs the
+%% algorithm. Deletes the previous version of the output in the D3 directory,
+%% copies the new output in the current directory to the D3 directory, and
+%% deletes the output in the current directory.
 main() ->  
 
-    %Initialize variables, processes.
     {ok, [X]} = io:fread("Enter the number of clients> ", "~d"),
     NumberOfClients = X,
     {ok, [Y]} = io:fread("Enter the number of servers> ", "~d"),
@@ -31,9 +38,9 @@ main() ->
     {ok, [K]} = io:fread("Enter the server capacity> ", "~d"),
     ServerCapacity = K,
     {ok, [Alg]} = io:fread("Enter the algorithm you wish to use for the 
-		simulation (greedy or firstworst)> ", "~s"),
-	Algorithm = Alg,
-	
+        simulation (greedy or firstworst)> ", "~s"),
+    Algorithm = Alg,
+    
     register(master_server, spawn(overseer, master_server, [NumberOfGroups])),
     
     ets:new(server_list, [ordered_set, named_table, public]),
@@ -48,135 +55,100 @@ main() ->
     print_file_header(whereis(before), 1, NumberOfGroups),
     AltGroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
     print_group_list(whereis(before), AltGroupList, 1, NumberOfGroups),
+    
     load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
-		Algorithm),
+        Algorithm),
     
     timer:sleep(5000),
     
     file:delete("../docs/visualization/D3/before.csv"),
     file:delete("../docs/visualization/D3/after.csv"),
     
-    %Copy before.csv, after.csv to D3 directory from current directory.
     file:copy("before.csv", "../docs/visualization/D3/before.csv"),
     file:copy("after.csv", "../docs/visualization/D3/after.csv"),
     
-    %Delete csv files in current directory.
     file:delete("before.csv"),
     file:delete("after.csv"),
-	
-    %Halt the overseer.
+    
     init:stop().
 
+%% ----------------------------------------------------------------------------
+%% @doc master_server/1
+%% Spawned at the beginning of the simulation. Handles the message passing
+%% in between the algorithm and client/server layers.
+%%
+%% Messages received:
+%%     print_group_list- receives a GroupList and prints it to the file
+%%         specified by process File_PID.
+%%     nonfull_server_request- a request made by a client when the server
+%%         that it attempts to join is full. The master_server selects a 
+%%         a new server for the client and sends the PID of that server
+%%         back to the client.
+%%
 master_server(NumberOfGroups) ->
     receive
         {print_group_list, GroupList} ->
-			File_PID = whereis(notbefore),
-			io:fwrite(File_PID, "Servers,", []),
-			print_file_header(File_PID, 1, NumberOfGroups),
-			print_group_list(File_PID, GroupList, 1, NumberOfGroups),
+            File_PID = whereis(notbefore),
+            io:fwrite(File_PID, "Servers,", []),
+            print_file_header(File_PID, 1, NumberOfGroups),
+            print_group_list(File_PID, GroupList, 1, NumberOfGroups),
             master_server(NumberOfGroups);
             
         {nonfull_server_request, Return_PID} ->
             ServerList = ets:tab2list(server_list),
             NewServer_PID = simulator:pick_random_server(ServerList),
             Return_PID ! {new_server_pid, NewServer_PID},
-            master_server(NumberOfGroups);
-            
-        {fullfil_capacity_request, Request_PID, Return_PID} ->
-            Request_PID ! {capacity_request, self()},
-            receive
-                {server_capacity, State, ServerCapacity} ->
-                    SpaceLeft = ServerCapacity - State,
-                    Return_PID ! {space_left, SpaceLeft},
-                    master_server(NumberOfGroups)
-            end;
-        
-        {check_server, Request_PID, Return_PID} ->
-			io:format("Master_server got message ~n"),
-			Request_PID ! {capacity_request, self()},
-		
-			receive
-                {server_capacity, State, ServerCapacity} ->
-                    SpaceLeft = ServerCapacity - State,
-                    Return_PID ! {space_left, SpaceLeft},
-                    master_server(NumberOfGroups)
-            end
+            master_server(NumberOfGroups)
     end.
-    
+
+%% ----------------------------------------------------------------------------
+%% @doc load_balancer/4
+%% Spawns the algorithm selected by the user at the start of the simulation.
+%%
+%% Input: NumberOfGroups- total number of possible groups in the simulation.
+%%        NumberOfServers- number of servers present in the simulation.
+%%        ServerCapacity- maximum number of clients a server can hold.
+%%        Algorithm- string name of the algorithm selected by the user.
+%% Output: None.    
 load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
-	Algorithm) ->
-	File_PID = whereis(notbefore),
-	GroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
-	
-	case {Algorithm} of
-		{Algorithm} when Algorithm =:= "greedy" ->
-			spawn(greedy, do_greedy, [GroupList, File_PID, ServerCapacity, 1,
-				now()]);
-		{Algorithm} when Algorithm =:= "firstworst" ->
-			ok
-	end.
+    Algorithm) ->
+    File_PID = whereis(notbefore),
+    GroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
     
+    case {Algorithm} of
+        {Algorithm} when Algorithm =:= "greedy" ->
+            spawn(greedy, do_greedy, [GroupList, File_PID, ServerCapacity, 1,
+                now()]);
+        {Algorithm} when Algorithm =:= "firstworst" ->
+            ok
+    end.
+
+%% ----------------------------------------------------------------------------
+%% @doc spawn_files/0
+%% Spawns the before and after csv file processes and registers them so the
+%% PIDs can be accessed globally.
+%%
+%% Input: None.
+%% Output: None.    
 spawn_files() ->
-	OneFile = file:open("before.csv", [write]),
+    OneFile = file:open("before.csv", [write]),
     FilePID = element(2, OneFile),
     register(before, FilePID),
     TwoFile = file:open("after.csv", [write]),
     AnotherPID = element(2, TwoFile),
     register(notbefore, AnotherPID).
-    
-%% ----------------------------------------------------------------------------
-%% @doc print_updated_clients/4
-%% This function prints the second, updated list of server GroupLists to
-%% the file 'after.csv' by printing the group count of each of the elements
-%% one element of the time until the last index of SortedGroupList has been
-%% printed. File_PID is the process identifier that represents 'after.csv'.
-%% 
-print_updated_clients(SortedGroupList, File_PID, GroupIndex, NumberOfGroups) 
-    when GroupIndex =< length(SortedGroupList) ->
-    
-    GroupCount = lists:nth(GroupIndex, SortedGroupList),
-    io:fwrite(File_PID, "Server ~w,", [GroupIndex]),
-    print_group_count(File_PID, GroupCount, 1, NumberOfGroups),
-    print_updated_clients(SortedGroupList, File_PID, GroupIndex+1, NumberOfGroups);
-
-print_updated_clients(SortedGroupList, File_PID, GroupIndex, NumberOfGroups) ->
-    io:format("Updated client assignments printed to after.csv.~n", []).
 
 %% ----------------------------------------------------------------------------
-%% @doc print_info/7
-%% This function uses several other functions present in overseer to manipulate
-%% the orddict ServerDict in such a way that the information that represents
-%% the number of clients in each group on each server in the simulation is 
-%% printed to the file 'before.csv'. File_PID is the process identifier that
-%% represents the file 'before.csv'. For every Server_PID key in ServerDict,
-%% print_info does the following:
-%%  -Fetches the list of keys in ServerDict (KeyList).
-%%  -Picks out each Server_PID from Keylist, one by one (Server_PID).
-%%  -Fetches the list of {Client_PID, GroupID} tuples for Server_PID (ClientList).
-%%  -Places the GroupID of every Client_PID in Server_PID in GroupList by use of get_second_element
-%%  -Counts the number of each GroupID in Server_PID and returns those values
-%%   in GroupCount ([#Clients Group 1, .., #Clients Group NumberOfGroups]).
-%%  -Prints each of those GroupCounts to 'before.csv' properly formatted using print_group_count.
-%% Once every Server_PID is accounted for, print_info returns GroupList, which is
-%% the list of every GroupCount list printed to 'before.csv'. 
-print_info(File_PID, ServerCount, NumberOfServers, NumberOfGroups, FullGroupList) 
-    when ServerCount =< NumberOfServers ->
-
-    ServerList = ets:tab2list(server_list),
-    Server_PID = element(1,lists:nth(ServerCount, ServerList)),
-    ClientList = overseer:get_matched_clients(Server_PID),
-    GroupList = get_second_element(ClientList, [], 1),
-    GroupCount = count_groups(GroupList, [], NumberOfGroups, 1),
-    io:fwrite(File_PID, "Server ~w,", [ServerCount]),
-    print_group_count(File_PID, GroupCount, 1, NumberOfGroups),
-    TempGroupList = FullGroupList ++ [GroupCount],
-    print_info(File_PID, ServerCount+1, NumberOfServers, NumberOfGroups, TempGroupList);
-
-print_info(File_PID, ServerCount, NumberOfServers, NumberOfGroups, GroupList) 
-    when ServerCount > NumberOfServers ->
-    
-    GroupList.
-
+%% @doc print_group_list/4
+%% Prints the GroupList passed into the function by the use of the function
+%% print_group_count/4 to file File_PID.
+%%
+%% Input: File_PID- file PID of the output file printed to.
+%%        GroupList- group list that is to be printed to File_PID.
+%%        GroupListIterator- integer iterator that cycles through each
+%%            index of the GroupList.
+%%        NumberOfGroups- total number of possible groups in the simulation.
+%% Output: None.
 print_group_list(File_PID, GroupList, GroupListIterator, NumberOfGroups) ->
     case GroupListIterator =< length(GroupList) of
         true ->
@@ -184,11 +156,27 @@ print_group_list(File_PID, GroupList, GroupListIterator, NumberOfGroups) ->
             io:fwrite(File_PID, "Server ~w,", [GroupListIterator]),
             print_group_count(File_PID, GroupListElement, 1, NumberOfGroups),
             print_group_list(File_PID, GroupList, GroupListIterator+1, 
-				NumberOfGroups);
+                NumberOfGroups);
         false ->
             ok
     end.
-    
+
+%% ----------------------------------------------------------------------------
+%% @doc get_group_list/4
+%% Compiles and returns the GroupList. For each Server_PID in the server_list,
+%% a ClientList, or the clients that are on server Server_PID, is created.
+%% A list of the number of clients in each group present on that server,
+%% GroupCount, is then created. A final list, or the GroupListElement, is
+%% appended to the running recursive list GroupList. Once every server has
+%% been exhausted, the final GroupList, a list of lists of size
+%% NumberOfServers, is returned.
+%%
+%% Input: NumberOfGroups- total number of possible groups in the simulation.
+%%        NumberOfServers- number of servers present in the simulation.
+%%        GroupList- initially []
+%%        GroupListIterator- initially 1, allows the function to iterate
+%%            through every server in the simulation.
+%% Output: GroupList- final GroupList of type [[]] and size NumberOfServers.
 get_group_list(NumberOfGroups, NumberOfServers, GroupList, GroupListIterator) ->
     case GroupListIterator =< NumberOfServers of
         true ->
@@ -221,16 +209,33 @@ get_matched_clients(Server_PID) ->
 %% ----------------------------------------------------------------------------
 %% @doc handle_client_movement/3
 %% Updates dictionary by moving all clients from RemovalServer_PID in group Group_ID
-%% to AdditionServer_PID.
+%% to AdditionServer_PID. It then sends a message to both servers, altering each of
+%% their respective states.
 %%
 %% Input: RemovalServer_PID- server clients are being removed from.
 %%        AdditionServer_PID- server clients are being added to.
 %%        Group_ID- group ID number of clients that are being moved.
 %% Output: None.
-handle_client_movement(RemovalServer_PID, AdditionServer_PID, Group_ID) ->
+handle_client_movement(RemovalServer_PID, AdditionServer_PID, Group_ID,
+    Return_PID) ->
     ClientsMoved = ets:select(dictionary, [{{'$1', RemovalServer_PID, Group_ID}, 
         [], ['$$']}]),
-    insert_new_client(ClientsMoved, AdditionServer_PID, Group_ID, 1).
+    insert_new_client(ClientsMoved, AdditionServer_PID, Group_ID, 1),
+    ClientChange = length(ClientsMoved),
+    
+    RemovalServer_PID ! {decrease_state, ClientChange, self()},
+    receive
+        {clients_removed} ->
+            ok
+    end,
+    
+    AdditionServer_PID ! {increase_state, ClientChange, self()},
+    receive
+        {clients_added} ->
+            ok
+    end,
+    
+    Return_PID ! {clients_moved}.
 
 %% ----------------------------------------------------------------------------
 %% @doc insert_new_client/4

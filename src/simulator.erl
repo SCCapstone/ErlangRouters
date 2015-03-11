@@ -4,14 +4,15 @@
 %% number of servers/clients based on what the overseer module wants
 %% to have spawned. Essentially, this module simulates clients pinging
 %% hosts in a cluster.
-%% @version 1.2.1
-%% @TODO Add functionality to account for server load capacity.
-%% Date Last Modified: 12/05/14
+%% @version 1.3
+%% @TODO Update documentation.
+
 -module(simulator).
--export([server/2,client/2,spawn_clients/2,spawn_servers/2, pick_random_server/1]).
+-export([server/2,client/2,spawn_clients/2,spawn_servers/2, 
+    pick_random_server/1]).
 
 %% ----------------------------------------------------------------------------
-%% @doc server(State).
+%% @doc server/2
 %% Represents a server. Maintains a server State to represent the number
 %% of times a server is pinged by clients. If the server receives a 
 %% request from a client, it accepts the client and sends a message back
@@ -19,27 +20,35 @@
 %% server function is recursively called.
 server(State, ServerCapacity) ->
     receive
-		{request, Return_PID, Group_ID} ->
-			case State < ServerCapacity of
-				true ->
-					io:format("Server ~w: Client request received from ~w~n",
-						[self(), Return_PID]),
-					NewState = State + 1,
-					ets:insert(dictionary, {Return_PID, self(), Group_ID}),
-					Return_PID ! {hit_count, NewState},
-					server(NewState, ServerCapacity);
-				false ->
-					io:format("Server ~w full.~n", [self()]),
-					Return_PID ! {server_full},
-					server(State, ServerCapacity)
-			end;
-		{capacity_request, Return_PID} ->
-			Return_PID ! {server_capacity, State, ServerCapacity},
-			server(State, ServerCapacity)
-	end.
+        {request, Return_PID, Group_ID} ->
+            case State < ServerCapacity of
+                true ->
+                    io:format("Server ~w: Client request received from ~w~n",
+                        [self(), Return_PID]),
+                    NewState = State + 1,
+                    ets:insert(dictionary, {Return_PID, self(), Group_ID}),
+                    Return_PID ! {hit_count, NewState},
+                    server(NewState, ServerCapacity);
+                false ->
+                    io:format("Server ~w full.~n", [self()]),
+                    Return_PID ! {server_full},
+                    server(State, ServerCapacity)
+            end;
+        {capacity_request, Return_PID} ->
+            Return_PID ! {server_capacity, State, ServerCapacity},
+            server(State, ServerCapacity);
+        {decrease_state, ClientChange, Return_PID} ->
+            NewState = State-ClientChange,
+            Return_PID ! {clients_removed},
+            server(NewState, ServerCapacity);
+        {increase_state, ClientChange, Return_PID} ->
+            NewState = State+ClientChange,
+            Return_PID ! {clients_added},
+            server(NewState, ServerCapacity)     
+    end.
   
 %% ----------------------------------------------------------------------------  
-%% @doc client(Server_Address).
+%% @doc client/2
 %% Represents a client. The client contains a server address for the 
 %% server that it is initially going to ping and a group ID (Group). The
 %% client sends a message to the server with PID Server_Address with its
@@ -47,21 +56,21 @@ server(State, ServerCapacity) ->
 %% server pinged letting the client know that it is now on the server with
 %% the server hit count.
 client(Server_Address, Group) ->
-	Server_Address ! {request, self(), Group},
-	io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
-	receive
-		{hit_count, Number} ->
-			io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
-				[self(), Number, Group]);
-		{server_full} ->
-			Master_PID = whereis(master_server),
-			Master_PID ! {nonfull_server_request, self()},
-			receive
-				{new_server_pid, NewServer_PID} ->
-					client(NewServer_PID, Group)
-			end
-		
-	end.
+    Server_Address ! {request, self(), Group},
+    io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
+    receive
+        {hit_count, Number} ->
+            io:format("Client ~w: Hit count was ~w, Group_ID: ~w~n~n", 
+                [self(), Number, Group]);
+        {server_full} ->
+            Master_PID = whereis(master_server),
+            Master_PID ! {nonfull_server_request, self()},
+            receive
+                {new_server_pid, NewServer_PID} ->
+                    client(NewServer_PID, Group)
+            end
+        
+    end.
 
 %% ----------------------------------------------------------------------------
 %% @doc spawn_clients/2

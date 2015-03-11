@@ -1,9 +1,8 @@
 %% @doc Greedy.
 %% Greedy algorithm for sorting clients on the cluster of servers by Group
 %% ID number.
-%% @version 1.1
-%% @TODO Increase robustness of Greedy solution.
-%% Date Last Modified: 2/10/2015
+%% @version 1.3
+%% @TODO Continue test cases for Greedy algorithm. Update documentation.
 
 -module(greedy).
 -export([do_greedy/5, reassign_clients/6, move_clients/5, change_element/3]).
@@ -18,26 +17,26 @@ do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex, StartTime)
     when GreedyIndex =< length(GroupList) ->
     
     spawn(greedy, reassign_clients, [GroupList, File_PID, ServerCapacity, 1, 
-		GreedyIndex, self()]),
-	
-	receive
-		{updated_group_list, TheGroupList} ->
-			TempGroupList = TheGroupList 
-	end,
-	
+        GreedyIndex, self()]),
+    
+    receive
+        {updated_group_list, TheGroupList} ->
+            TempGroupList = TheGroupList 
+    end,
+    
     do_greedy(TempGroupList, File_PID, ServerCapacity, GreedyIndex+1, 
-		StartTime);
+        StartTime);
     
 do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex, StartTime) ->
-	EndTime = now(),
-	ElapsedTime = timer:now_diff(EndTime, StartTime),
-	io:format("Greedy algorithm completed.~n"),
-	io:format("Elapsed time: ~w microseconds.~n", [ElapsedTime]),
+    EndTime = now(),
+    ElapsedTime = timer:now_diff(EndTime, StartTime),
+    io:format("Greedy algorithm completed.~n"),
+    io:format("Elapsed time: ~w microseconds.~n", [ElapsedTime]),
     Master_PID = whereis(master_server),
     Master_PID ! {print_group_list, GroupList}.
 
 %% ----------------------------------------------------------------------------
-%% @doc reassign_clients/5
+%% @doc reassign_clients/6
 %% This function reassigns the clients to different servers using our first
 %% iteration of the greedy algorithm.
 %% It takes in a lists of lists GroupList, in which each element of the list
@@ -76,9 +75,9 @@ reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex,
                 1, RelevantServers, self()]),
                 
             receive
-				{moved_clients, MovedClients} ->
-					UpdatedGreedyList = lists:nth(1, MovedClients),
-					UpdatedNonGreedyList = lists:nth(2, MovedClients)
+                {moved_clients, MovedClients} ->
+                    UpdatedGreedyList = lists:nth(1, MovedClients),
+                    UpdatedNonGreedyList = lists:nth(2, MovedClients)
             end,    
             
             UpdatedGroupList = change_element(GroupListIndex, change_element(
@@ -92,7 +91,7 @@ reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex,
     Return_PID ! {updated_group_list, GroupList}.
 
 %% ----------------------------------------------------------------------------
-%% @doc move_clients/4
+%% @doc move_clients/5
 %% This function takes in the list information from the two servers to be
 %% compared from reassign_clients and recursively runs our greedy algorithm
 %% on those two lists from the first group index of the group lists to the
@@ -111,69 +110,105 @@ reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex,
 %% updated primary and secondary server group lists are returned in a list
 %% of size two [primary, secondary].
 move_clients(GreedyServerList, NonGreedyServerList, Iterator, RelevantServers,
-	Return_PID) ->
-	
-	case Iterator =< length(GreedyServerList) of
-		true -> 
-		    
-		    Master_PID = whereis(master_server),
-		    
-		    GreedyElement = lists:nth(Iterator, GreedyServerList),
-		    NonGreedyElement = lists:nth(Iterator, NonGreedyServerList),
-		    
-		    GreedyServer_PID = lists:nth(1, RelevantServers),
-		    NonGreedyServer_PID = lists:nth(2, RelevantServers),
-		    
-		    case {GreedyElement, NonGreedyElement} of
-		    
-		        {GreedyElement, NonGreedyElement} 
-		            when (GreedyElement =< NonGreedyElement) and 
-						(GreedyElement =/= 0) ->
-						
-						    TempNonGreedyList = change_element(Iterator, 
-								NonGreedyServerList, GreedyElement+
-								NonGreedyElement),
-			                TempGreedyList = change_element(Iterator, 
-								GreedyServerList,GreedyElement-
-								GreedyElement),
-			                
-			                overseer:handle_client_movement(
-								GreedyServer_PID, NonGreedyServer_PID, 
-								Iterator),
-			                    
-			                move_clients(TempGreedyList, TempNonGreedyList, 
-								Iterator+1, RelevantServers, Return_PID);
-		            
-		        {GreedyElement, NonGreedyElement} 
-		            when (NonGreedyElement < GreedyElement) and 
-						(GreedyElement =/= 0) ->
-						
-						TempGreedyList = change_element(Iterator, 
-							NonGreedyServerList, GreedyElement+
-							NonGreedyElement),
-		                TempNonGreedyList = change_element(Iterator, 
-							GreedyServerList, NonGreedyElement-
-							NonGreedyElement),
-		                
-		                overseer:handle_client_movement(
-							GreedyServer_PID, NonGreedyServer_PID, 
-							Iterator),
-		                    
-		                move_clients(TempGreedyList, TempNonGreedyList, 
-							Iterator+1, RelevantServers, Return_PID);
-		         
-		        {GreedyElement, NonGreedyElement} 
-		            when GreedyElement == 0 ->
-		            
-		                move_clients(GreedyServerList, NonGreedyServerList, 
-							Iterator+1, RelevantServers, Return_PID)
-		    end;
-		    
-		false ->
-			MovedClients = [GreedyServerList, NonGreedyServerList],
-			Return_PID ! {moved_clients, MovedClients}
-	end.
-			
+    Return_PID) ->
+    
+    case Iterator =< length(GreedyServerList) of
+        true -> 
+            
+            Master_PID = whereis(master_server),
+            
+            GreedyElement = lists:nth(Iterator, GreedyServerList),
+            NonGreedyElement = lists:nth(Iterator, NonGreedyServerList),
+            
+            GreedyServer_PID = lists:nth(1, RelevantServers),
+            NonGreedyServer_PID = lists:nth(2, RelevantServers),
+            
+            GreedyServer_PID ! {capacity_request, self()},
+            
+            receive
+                {server_capacity, State, ServerCapacity} ->
+                    GreedyRemCapacity = ServerCapacity-State
+            end,
+            
+            NonGreedyServer_PID ! {capacity_request, self()},
+            
+            receive
+                {server_capacity, State2, ServerCapacity2} ->
+                    NonGreedyRemCapacity = ServerCapacity2-State2
+            end,
+            
+            case {GreedyElement, NonGreedyElement} of
+            
+                {GreedyElement, NonGreedyElement}
+                    when (GreedyElement =< NonGreedyElement) and 
+                        (GreedyElement =/= 0) ->
+                        
+                        case NonGreedyRemCapacity >= NonGreedyElement of
+                            true ->
+                                TempNonGreedyList = change_element(Iterator, 
+                                    NonGreedyServerList, GreedyElement+
+                                    NonGreedyElement),
+                                TempGreedyList = change_element(Iterator, 
+                                    GreedyServerList,GreedyElement-
+                                    GreedyElement),
+                                
+                                spawn(overseer, handle_client_movement,
+                                    [GreedyServer_PID, NonGreedyServer_PID, 
+                                    Iterator, self()]),
+                                    
+                                receive
+                                    {clients_moved} ->
+                                        ok
+                                end,
+                                    
+                                move_clients(TempGreedyList, TempNonGreedyList, 
+                                    Iterator+1, RelevantServers, Return_PID);
+                            false ->
+                                move_clients(GreedyServerList, NonGreedyServerList, 
+                                    Iterator+1, RelevantServers, Return_PID)
+                        end;
+                    
+                 {GreedyElement, NonGreedyElement}
+                    when (NonGreedyElement < GreedyElement) and 
+                        (GreedyElement =/= 0) ->
+                        
+                        case GreedyRemCapacity >= GreedyElement of
+                            true ->
+                                TempGreedyList = change_element(Iterator, 
+                                    NonGreedyServerList, GreedyElement+
+                                    NonGreedyElement),
+                                TempNonGreedyList = change_element(Iterator, 
+                                    GreedyServerList,NonGreedyElement-
+                                    NonGreedyElement),
+                                
+                                spawn(overseer, handle_client_movement,
+                                    [GreedyServer_PID, NonGreedyServer_PID, 
+                                    Iterator, self()]),
+                                
+                                receive
+                                    {clients_moved} ->
+                                        ok
+                                end,    
+                                
+                                move_clients(TempGreedyList, TempNonGreedyList, 
+                                    Iterator+1, RelevantServers, Return_PID);
+                            false ->
+                                move_clients(GreedyServerList, NonGreedyServerList, 
+                                    Iterator+1, RelevantServers, Return_PID)
+                        end;
+                 
+                {GreedyElement, NonGreedyElement}
+                    when (GreedyElement == 0) ->
+                    
+                        move_clients(GreedyServerList, NonGreedyServerList, 
+                            Iterator+1, RelevantServers, Return_PID)
+            end;
+            
+        false ->
+            MovedClients = [GreedyServerList, NonGreedyServerList],
+            Return_PID ! {moved_clients, MovedClients}
+    end.
+            
 
 %% ----------------------------------------------------------------------------
 %% @doc change_element/3
