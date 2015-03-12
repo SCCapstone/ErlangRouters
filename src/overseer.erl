@@ -120,7 +120,11 @@ load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
             spawn(greedy, do_greedy, [GroupList, File_PID, ServerCapacity, 1,
                 now()]);
         {Algorithm} when Algorithm =:= "firstworst" ->
-            ok
+            NewGroupList = firstworst:first_worst(GroupList, ServerCapacity,
+                now()),
+            io:fwrite(File_PID, "Servers,", []),
+            print_file_header(File_PID, 1, NumberOfGroups),
+            print_group_list(File_PID, NewGroupList, 1, NumberOfGroups)   
     end.
 
 %% ----------------------------------------------------------------------------
