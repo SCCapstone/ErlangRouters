@@ -59,5 +59,4 @@ distclean: clean
 
 precommit: distclean get-deps build-deps ct edoc
 
-sim: $(CURDIR)/ebin/simulator.beam
-		erl -noshell -s simulator main 50
+		
