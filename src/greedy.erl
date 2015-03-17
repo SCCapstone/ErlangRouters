@@ -5,7 +5,7 @@
 %% @TODO Continue test cases for Greedy algorithm. Update documentation.
 
 -module(greedy).
--export([do_greedy/5, reassign_clients/6, move_clients/5, change_element/3]).
+-export([do_greedy/4, reassign_clients/5, move_clients/5, change_element/3]).
 
 %% ----------------------------------------------------------------------------
 %% @doc do_greedy/5
@@ -13,10 +13,10 @@
 %% of GroupList, which essentially runs our greedy algorithm locally for each
 %% server in the cluster. The final modified list of load balanced clients is
 %% returned once every server has been accounted for (GroupList).
-do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex, StartTime)
+do_greedy(GroupList, ServerCapacity, GreedyIndex, StartTime)
     when GreedyIndex =< length(GroupList) ->
     
-    spawn(greedy, reassign_clients, [GroupList, File_PID, ServerCapacity, 1, 
+    spawn(greedy, reassign_clients, [GroupList, ServerCapacity, 1, 
         GreedyIndex, self()]),
     
     receive
@@ -24,10 +24,9 @@ do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex, StartTime)
             TempGroupList = TheGroupList 
     end,
     
-    do_greedy(TempGroupList, File_PID, ServerCapacity, GreedyIndex+1, 
-        StartTime);
+    do_greedy(TempGroupList, ServerCapacity, GreedyIndex+1, StartTime);
     
-do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex, StartTime) ->
+do_greedy(GroupList, ServerCapacity, GreedyIndex, StartTime) ->
     EndTime = now(),
     ElapsedTime = timer:now_diff(EndTime, StartTime),
     io:format("Greedy algorithm completed.~n"),
@@ -53,13 +52,13 @@ do_greedy(GroupList, File_PID, ServerCapacity, GreedyIndex, StartTime) ->
 %% at the next Server in the list (Servers 2 through Server NumberOfServers).
 %% Once every Server in GroupList has been accounted for, reassign_clients
 %% returns the final version of GroupList.
-reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex,
+reassign_clients(GroupList, ServerCapacity, GroupListIndex,
     GreedyIndex, Return_PID)
     when GroupListIndex =< length(GroupList) ->
     
     case GroupListIndex == GreedyIndex of
         true ->
-            reassign_clients(GroupList, File_PID, ServerCapacity,
+            reassign_clients(GroupList, ServerCapacity,
                 GroupListIndex+1, GreedyIndex, Return_PID);
         false ->
             GreedyServerList = lists:nth(GreedyIndex, GroupList),
@@ -83,10 +82,10 @@ reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex,
             UpdatedGroupList = change_element(GroupListIndex, change_element(
                 GreedyIndex, GroupList, UpdatedGreedyList), UpdatedNonGreedyList),
                 
-            reassign_clients(UpdatedGroupList, File_PID, ServerCapacity,
+            reassign_clients(UpdatedGroupList, ServerCapacity,
                 GroupListIndex+1, GreedyIndex, Return_PID)
     end;
-reassign_clients(GroupList, File_PID, ServerCapacity, GroupListIndex, 
+reassign_clients(GroupList, ServerCapacity, GroupListIndex, 
     GreedyIndex, Return_PID) ->
     Return_PID ! {updated_group_list, GroupList}.
 
