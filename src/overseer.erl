@@ -117,7 +117,7 @@ load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
     
     case {Algorithm} of
         {Algorithm} when Algorithm =:= "greedy" ->
-            spawn(greedy, do_greedy, [GroupList, File_PID, ServerCapacity, 1,
+            spawn(greedy, do_greedy, [GroupList, ServerCapacity, 1,
                 now()]);
         {Algorithm} when Algorithm =:= "firstworst" ->
             NewGroupList = firstworst:first_worst(GroupList, ServerCapacity,

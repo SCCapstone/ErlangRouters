@@ -4,8 +4,8 @@
 %% number of servers/clients based on what the overseer module wants
 %% to have spawned. Essentially, this module simulates clients pinging
 %% hosts in a cluster.
-%% @version 1.3
-%% @TODO Update documentation.
+%% @version 1.3.1
+%% @TODO Move io output to log file.
 
 -module(simulator).
 -export([server/2,client/2,spawn_clients/2,spawn_servers/2, 
@@ -14,10 +14,21 @@
 %% ----------------------------------------------------------------------------
 %% @doc server/2
 %% Represents a server. Maintains a server State to represent the number
-%% of times a server is pinged by clients. If the server receives a 
-%% request from a client, it accepts the client and sends a message back
-%% to the client with the current hit count of the server and then the
-%% server function is recursively called.
+%% of clients on the Server at a given iteration, as well as ServerCapacity,
+%% the maximum number of clients that the server can hold.
+%% Messages that the server can currently receive:
+%%     request- client request to join a server. If the server has enough
+%%         capacity, the server will increment its state, insert the new
+%%         {Client_PID, Server_PID, Group_ID} tuple into the global ets
+%%         dictionary, and send a hit_count message back to the client with
+%%         its current state. If the server is full, it sends a server_full
+%%         message back to the client.
+%%     capacity_request- sends a server_capacity message back to the
+%%         Return_PID with both its State and overall ServerCapacity.
+%%     decrease_state- decreases its state by ClientChange. Simulates the
+%%         the removal of ClientChange number of clients from the server.
+%%     increase_state- same as decrease_state, but instead increases its 
+%%         state by ClientChange.
 server(State, ServerCapacity) ->
     receive
         {request, Return_PID, Group_ID} ->
@@ -54,7 +65,11 @@ server(State, ServerCapacity) ->
 %% client sends a message to the server with PID Server_Address with its
 %% request and own process ID. The client recieves a message from the 
 %% server pinged letting the client know that it is now on the server with
-%% the server hit count.
+%% the server hit count. If the server does not have enough room to let the
+%% client join, the client instead receives a server_full message. If this
+%% is indeed the case, the client sends a new_server_pid message to the master
+%% server requesting the PID of another server in the cluster that it can join.
+%% The client then pings the new server in an attempt to join it instead.
 client(Server_Address, Group) ->
     Server_Address ! {request, self(), Group},
     io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
@@ -98,8 +113,7 @@ spawn_clients(0, NumberOfGroups) ->
 %% @doc spawn_servers(NumberOfServers, ServerCapacity).
 %% Spawns a number of server processes equal to NumberOfServers. A server is
 %% spawned, with a Server_PID of the process recorded. That Server_PID is then
-%% inserted into the server_list. Servers are spawned until the NumberOfServers
-%% left to spawn is 0.
+%% inserted into the global ets table server_list. 
 %%
 %% Input: NumberOfServers- the number of servers to be spawned
 %% Ouput: None 

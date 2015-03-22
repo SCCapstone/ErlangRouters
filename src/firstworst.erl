@@ -9,7 +9,6 @@
 %%  *optimize fragcalc.erl & listops.erl functions
 %%
 %%
-%% Date Last Modified: 3/11/2015
 %% 
 %% This module uses exports of fragcalc.erl & listops.erl
 
