@@ -1,7 +1,7 @@
 #README: SCCapstone - ErlangRouters Project
 
 Lasted edited: 3/17/2015  
-Team members: Graham Booker, Paul Melton, Davis Alexander, George Akhvlediani, Joe McDowell
+Team members: Graham Brooker, Paul Melton, Davis Alexander, George Akhvlediani, Joe McDowell
 
 ## What's in the Repo?
 
