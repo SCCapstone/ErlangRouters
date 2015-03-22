@@ -1,18 +1,21 @@
 %% @doc Greedy.
 %% Greedy algorithm for sorting clients on the cluster of servers by Group
 %% ID number.
-%% @version 1.3
-%% @TODO Continue test cases for Greedy algorithm. Update documentation.
+%% @version 1.3.1
+%% @TODO Continue test cases for Greedy algorithm. 
 
 -module(greedy).
--export([do_greedy/4, reassign_clients/5, move_clients/5, change_element/3]).
+-export([do_greedy/4, reassign_clients/5, move_clients/5]).
 
 %% ----------------------------------------------------------------------------
-%% @doc do_greedy/5
-%% This function runs the function reassign_clients/5 recursively for every member
-%% of GroupList, which essentially runs our greedy algorithm locally for each
-%% server in the cluster. The final modified list of load balanced clients is
-%% returned once every server has been accounted for (GroupList).
+%% @doc do_greedy/4
+%% This function calls reassign_clients/5 for the particular GroupList. The
+%% greedy algorithm is run and the updated GroupList is received from the
+%% reassign_clients/5 process. This function runs length(GroupList) times,
+%% so each server in the cluster can act as the greedy server. Once every
+%% server has had its chance to 'be greedy', the total elapsed time for the
+%% algorithm is printed and the final GroupList is sent to the master server
+%% to be printed to csv output for the visualization piece.
 do_greedy(GroupList, ServerCapacity, GreedyIndex, StartTime)
     when GreedyIndex =< length(GroupList) ->
     
@@ -36,22 +39,20 @@ do_greedy(GroupList, ServerCapacity, GreedyIndex, StartTime) ->
 
 %% ----------------------------------------------------------------------------
 %% @doc reassign_clients/6
-%% This function reassigns the clients to different servers using our first
-%% iteration of the greedy algorithm.
-%% It takes in a lists of lists GroupList, in which each element of the list
-%% is the list of the number of clients in Groups 1 through NumberOfGroups
-%% and the total number of elements is NumberOfServers. The current algorithm
-%% compares the group values for the first Server in the list (FirstServerList)
-%% with every other Server in GroupList (CurrentServerList). The method is
-%% recursively called to compare Server 1 to every other Server, one Server
-%% at a time. The function reassigns the clients by calling move_clients,
-%% which runs our greedy solution and returns both Server lists that have
-%% been changed in a list-tuple MovedClients. Then, the GroupList is
-%% modified to account for these two changes by the use of the function
-%% change_element. The function is then recursively called to take a look
-%% at the next Server in the list (Servers 2 through Server NumberOfServers).
-%% Once every Server in GroupList has been accounted for, reassign_clients
-%% returns the final version of GroupList.
+%% This function essentially calls the move_clients/5 function for every 
+%% combination of GreedyServer/NonGreedyServer pairs (called NumberOfServers-1
+%% times). GroupListIndex is the index of the overall GroupList that represents
+%% the non greedy server's individual GroupList; GreedyIndex represents the
+%% greedy server's individual GroupList in the overall GroupList. When the
+%% GroupListIndex is not equal to the GreedyIndex (you're currently not
+%% examining the greedy server's GroupList twice), the function pulls the
+%% two elements of the overall GroupList from the indexes denoted by 
+%% GroupListIndex and GreedyIndex, the overall ServerList is pulled from
+%% global storage and the server PIDs of the two servers that are to be
+%% examined by move_clients/4 are placed into RelevantServers. Then,
+%% move_clients/4 is called for those two servers and the resultant updated
+%% server lists are inserted into the overall GroupList. The function is
+%% then run for the next possible GreedyServer/OtherServer pair.
 reassign_clients(GroupList, ServerCapacity, GroupListIndex,
     GreedyIndex, Return_PID)
     when GroupListIndex =< length(GroupList) ->
@@ -79,8 +80,9 @@ reassign_clients(GroupList, ServerCapacity, GroupListIndex,
                     UpdatedNonGreedyList = lists:nth(2, MovedClients)
             end,    
             
-            UpdatedGroupList = change_element(GroupListIndex, change_element(
-                GreedyIndex, GroupList, UpdatedGreedyList), UpdatedNonGreedyList),
+            UpdatedGroupList = listops:change_element(GroupListIndex, 
+                listops:change_element(GreedyIndex, GroupList, UpdatedGreedyList), 
+                UpdatedNonGreedyList),
                 
             reassign_clients(UpdatedGroupList, ServerCapacity,
                 GroupListIndex+1, GreedyIndex, Return_PID)
@@ -91,23 +93,41 @@ reassign_clients(GroupList, ServerCapacity, GroupListIndex,
 
 %% ----------------------------------------------------------------------------
 %% @doc move_clients/5
-%% This function takes in the list information from the two servers to be
-%% compared from reassign_clients and recursively runs our greedy algorithm
-%% on those two lists from the first group index of the group lists to the
-%% length(FirstServerList) index (last index) of the group lists. For each
-%% index in these lists, the following happens: if the first (primary priority) server
-%% list's element is lessthanequal to the current (secondary priority) server list's
-%% element and the primary server list's value at that index is not zero,
-%% then those clients in that group from the primary server are moved to
-%% the secondary server by the use of the function change_element. If the
-%% opposite occurs, then the clients in that particular index are moved from
-%% the secondary server to the primary server. If the primary server list's
-%% value at that particular index is 0, then we know that the optimum solution
-%% has already been reached (no clients of a particular group ID are on the
-%% server that the greedy solution is trying to optimize) so we skip that
-%% index. Once every index of these group lists have been exhaused, the
-%% updated primary and secondary server group lists are returned in a list
-%% of size two [primary, secondary].
+%% This function moves clients in the same group in one of two ways: 1) 
+%% clients in GreedyServer -> NonGreedyServer or 2) clients in 
+%% NonGreedyServer -> GreedyServer. The function takes in the two lists
+%% GreedyServerList (Greedy server's individual GroupList) and
+%% NonGreedyServerList(Non-greedy server's individual GroupList). The list of
+%% two elements, RelevantServers, denotes which two servers these two lists are
+%% referring to. For each index in these GroupLists (function iterates
+%% NumberOfGroups times by incrementing Iterator), the function first sends
+%% a message to both servers requesting their current states and places
+%% the amount of capacity they have left in two variables GreedyRemCapacity
+%% and NonGreedyRemCapacity. Then, the two lists are compared at the 
+%% particular index Iterator by setting GreedyElement equal to the 
+%% GreedyServerList's value and NonGreedyElement equal to NonGreedyServerList's
+%% value. Then, the following cases may take place:
+%%   1) GreedyElement is lessthanequal to NonGreedyElement, GreedyElement is
+%%      not equal to zero. If this is the case, the clients in group number
+%%      Iterator are moved from GreedyServer to NonGreedyServer, barring
+%%      a lack of capacity on NonGreedyServer, in which case no clients are
+%%      moved.
+%%   2) GreedyElement is greater than NonGreedyElement, GreedyElement is
+%%      not equal to zero. If this is the case, the clients in group number
+%%      Iterator are moved from NonGreedyServer to GreedyServer, barring
+%%      a lack of capacity on GreedyServer, in which case no clients are
+%%      moved.
+%%   3) GreedyElement is equal to zero. Because there are no clients on 
+%%      GreedyServer to move, we will be 'greedy' and move on to the next
+%%      group and move no clients, since no clients need to be moved.
+%% Once the function has iterated through every index of GreedyServerList/
+%% NonGreedyServerList, the function sends a message back to the Return_PID
+%% (PID of the spawned reassign_clients function) containing MovedClients,
+%% a list of two elements containing the updated GreedyServerList and 
+%% NonGreedyServerList.
+%%
+%% Note: the bulk of the algorithmic work is done here. This function checks
+%% the server capacities, moves the clients, and updates the lists accordingly.
 move_clients(GreedyServerList, NonGreedyServerList, Iterator, RelevantServers,
     Return_PID) ->
     
@@ -144,10 +164,10 @@ move_clients(GreedyServerList, NonGreedyServerList, Iterator, RelevantServers,
                         
                         case NonGreedyRemCapacity >= NonGreedyElement of
                             true ->
-                                TempNonGreedyList = change_element(Iterator, 
+                                TempNonGreedyList = listops:change_element(Iterator, 
                                     NonGreedyServerList, GreedyElement+
                                     NonGreedyElement),
-                                TempGreedyList = change_element(Iterator, 
+                                TempGreedyList = listops:change_element(Iterator, 
                                     GreedyServerList,GreedyElement-
                                     GreedyElement),
                                 
@@ -173,10 +193,10 @@ move_clients(GreedyServerList, NonGreedyServerList, Iterator, RelevantServers,
                         
                         case GreedyRemCapacity >= GreedyElement of
                             true ->
-                                TempGreedyList = change_element(Iterator, 
+                                TempGreedyList = listops:change_element(Iterator, 
                                     NonGreedyServerList, GreedyElement+
                                     NonGreedyElement),
-                                TempNonGreedyList = change_element(Iterator, 
+                                TempNonGreedyList = listops:change_element(Iterator, 
                                     GreedyServerList,NonGreedyElement-
                                     NonGreedyElement),
                                 
@@ -208,13 +228,3 @@ move_clients(GreedyServerList, NonGreedyServerList, Iterator, RelevantServers,
             Return_PID ! {moved_clients, MovedClients}
     end.
             
-
-%% ----------------------------------------------------------------------------
-%% @doc change_element/3
-%% This function replaces the element of a List at index Index with
-%% NewElement through list manipulation.
-%% change_element(Index, List, NewElement) -> List.
-change_element(1, [_|After], NewElement) ->
-    [NewElement|After];
-change_element(I, [Before|After], NewElement) ->
-    [Before|change_element(I-1, After, NewElement)].

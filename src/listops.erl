@@ -3,15 +3,11 @@
 %% Does not call anything, only exports functions.
 %% 
 %% @version 1.0
-%% @TODO 
-%%
-%%  
-%% Date Last Modified: 3/11/2015
-%% 
+%% @TODO Unify functions in other modules with these functions.
 %%
 
 -module(listops).
--export([ change/3, sum/1, max_index/1]).
+-export([change/3, sum/1, max_index/1, change_element/3]).
 
 
 %% ----------------------------------------------------------------------------
@@ -22,8 +18,8 @@
 %% {INT} Index - The index of the value to be changed
 %% {ANY} Value - The new value
 change(List, Index, Value) ->
-	OutputList = change_listval(List, [], Index, Value, 1),
-	OutputList.
+    OutputList = change_listval(List, [], Index, Value, 1),
+    OutputList.
 
 
 %% ----------------------------------------------------------------------------
@@ -43,17 +39,17 @@ change(List, Index, Value) ->
 %% It might be possible to speed this up signficantly via concatenation.
 %%
 change_listval(InputList, OutputList, Index, Value, Iterator)
-	when Iterator =< length(InputList) ->
-	case Iterator == Index of
-		true -> 
-			NewOutputList = lists:append([OutputList, [Value]]);
-		false ->
-			OldVal = lists:nth(Iterator, InputList),
-			NewOutputList = lists:append([OutputList, [OldVal]])
-	end,
-	change_listval(InputList, NewOutputList, Index, Value, Iterator+1);
+    when Iterator =< length(InputList) ->
+    case Iterator == Index of
+        true -> 
+            NewOutputList = lists:append([OutputList, [Value]]);
+        false ->
+            OldVal = lists:nth(Iterator, InputList),
+            NewOutputList = lists:append([OutputList, [OldVal]])
+    end,
+    change_listval(InputList, NewOutputList, Index, Value, Iterator+1);
 change_listval(InputList, OutputList, Index, Value, Iterator) ->
-	OutputList.
+    OutputList.
 
 
 
@@ -64,8 +60,8 @@ change_listval(InputList, OutputList, Index, Value, Iterator) ->
 %% @doc sum/1
 %% Calls the sum_integers function with the inputted list.
 sum(List) ->
-	Sum = sum_integers(List, 0, 1),
-	Sum.
+    Sum = sum_integers(List, 0, 1),
+    Sum.
 
 %% ----------------------------------------------------------------------------
 %% @doc sum_integers/3
@@ -78,11 +74,11 @@ sum(List) ->
 %% I kind of hesistate to do that because 
 %% it's really easy break if incorrect indecies are inputted.
 sum_integers(List, Sum, Iterator) 
-	when Iterator =< length(List) ->
-	CurrentSum = lists:nth(Iterator, List),
-	sum_integers(List, Sum + CurrentSum, Iterator + 1);
+    when Iterator =< length(List) ->
+    CurrentSum = lists:nth(Iterator, List),
+    sum_integers(List, Sum + CurrentSum, Iterator + 1);
 sum_integers(List, Sum, Iterator) ->
-	Sum.  
+    Sum.  
 
 
 
@@ -92,8 +88,8 @@ sum_integers(List, Sum, Iterator) ->
 %% Calls indexof_maxvalue and gets the index first highest value for 
 %% the inputted list.
 max_index(List) ->
-	OutputIndex = indexof_maxvalue(List, 1, 1),
-	OutputIndex.
+    OutputIndex = indexof_maxvalue(List, 1, 1),
+    OutputIndex.
 
 
 
@@ -107,15 +103,25 @@ max_index(List) ->
 %% first highest value in List. 
 %%
 indexof_maxvalue(List, MaxIndex, Iterator) 
-	when Iterator =< length(List) ->
-	CurrentValue = lists:nth(Iterator, List),
-	MaxValue =  lists:nth(MaxIndex, List),
-	case CurrentValue > MaxValue of
-		true -> %%Change to >= if you want last highest. 
-			indexof_maxvalue(List, Iterator, Iterator + 1); 
-		false ->
-			indexof_maxvalue(List, MaxIndex, Iterator + 1)
-	end;
+    when Iterator =< length(List) ->
+    CurrentValue = lists:nth(Iterator, List),
+    MaxValue =  lists:nth(MaxIndex, List),
+    case CurrentValue > MaxValue of
+        true -> %%Change to >= if you want last highest. 
+            indexof_maxvalue(List, Iterator, Iterator + 1); 
+        false ->
+            indexof_maxvalue(List, MaxIndex, Iterator + 1)
+    end;
 indexof_maxvalue(List, MaxIndex, Iterator) ->
-	TheMAX = MaxIndex,
-	TheMAX.
+    TheMAX = MaxIndex,
+    TheMAX.
+
+%% ----------------------------------------------------------------------------
+%% @doc change_element/3
+%% This function replaces the element of a List at index Index with
+%% NewElement through list manipulation.
+%% change_element(Index, List, NewElement) -> List.
+change_element(1, [_|After], NewElement) ->
+    [NewElement|After];
+change_element(I, [Before|After], NewElement) ->
+    [Before|change_element(I-1, After, NewElement)].
