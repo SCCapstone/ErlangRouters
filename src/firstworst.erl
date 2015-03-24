@@ -165,6 +165,12 @@ reassign_group(GroupList, GroupIndex, SIndex, RcvServer, Iterator)
             NewGL = listops:change(GroupList, Iterator, RcvServer),
             reassign_group(NewGL, GroupIndex, SIndex, RcvServer, Iterator+1);
         false ->
+            ServerList = ets:tab2list(server_list),
+            RcvServer_PID = element(1, lists:nth(SIndex, ServerList)),
+            SndServer_PID = element(1, lists:nth(Iterator, ServerList)),
+            spawn(overseer, handle_client_movement,
+                                    [SndServer_PID, RcvServer_PID, 
+                                    GroupIndex]),            
             ClearServer = listops:change(CurrentServer, GroupIndex, 0),
             NewGL = listops:change(GroupList, Iterator, ClearServer),
             reassign_group(NewGL, GroupIndex, SIndex, RcvServer, Iterator+1)

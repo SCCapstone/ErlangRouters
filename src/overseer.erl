@@ -12,7 +12,7 @@
 -export([main/0, get_second_element/3, print_group_count/4,
  print_file_header/3, count_groups/4, get_num_clients/4, 
  get_matched_clients/1, master_server/1,
- handle_client_movement/4, insert_new_client/4, get_group_list/4, 
+ handle_client_movement/4, handle_client_movement/3, insert_new_client/4, get_group_list/4, 
  load_balancer/4, print_group_list/4, spawn_files/0]).
  
 %% ----------------------------------------------------------------------------
@@ -55,10 +55,10 @@ main() ->
     print_file_header(whereis(before), 1, NumberOfGroups),
     AltGroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
     print_group_list(whereis(before), AltGroupList, 1, NumberOfGroups),
-    
+     
     load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
         Algorithm),
-    
+
     timer:sleep(5000),
     
     file:delete("../docs/visualization/D3/before.csv"),
@@ -211,7 +211,7 @@ get_matched_clients(Server_PID) ->
     ClientMatches.
 
 %% ----------------------------------------------------------------------------
-%% @doc handle_client_movement/3
+%% @doc handle_client_movement/4
 %% Updates dictionary by moving all clients from RemovalServer_PID in group Group_ID
 %% to AdditionServer_PID. It then sends a message to both servers, altering each of
 %% their respective states.
@@ -240,6 +240,36 @@ handle_client_movement(RemovalServer_PID, AdditionServer_PID, Group_ID,
     end,
     
     Return_PID ! {clients_moved}.
+
+
+%% ----------------------------------------------------------------------------
+%% @doc handle_client_movement/3
+%% Updates dictionary by moving all clients from RemovalServer_PID in group Group_ID
+%% to AdditionServer_PID. It then sends a message to both servers, altering each of
+%% their respective states.
+%%
+%% Input: RemovalServer_PID- server clients are being removed from.
+%%        AdditionServer_PID- server clients are being added to.
+%%        Group_ID- group ID number of clients that are being moved.
+%% Output: None.
+ handle_client_movement(SendServer_PID, ReceiveServer_PID, Group_ID) ->
+    ClientsMoved = ets:select(dictionary, [{{'$1', SendServer_PID, Group_ID}, 
+        [], ['$$']}]),
+    insert_new_client(ClientsMoved, ReceiveServer_PID, Group_ID, 1),
+    ClientChange = length(ClientsMoved),
+    
+    SendServer_PID ! {decrease_state, ClientChange, self()},
+    receive
+        {clients_removed} ->
+            ok
+    end,
+    
+    ReceiveServer_PID ! {increase_state, ClientChange, self()},
+    receive
+        {clients_added} ->
+            ok
+    end.
+    
 
 %% ----------------------------------------------------------------------------
 %% @doc insert_new_client/4
