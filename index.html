@@ -23,13 +23,35 @@
 
 <p>Team members: Graham Brooker, Paul Melton, Davis Alexander, George Akhvlediani, Joe McDowell</p>
 
-<p>Please take a look at the following links on our Github Wiki to gain a better understanding of our project:</p>
+<p>Here is a short overview of our program and the project we took on:</p>
 
-<ul>
-<li>The overall architecture of the simulator is explained <a href="https://github.com/SCCapstone/ErlangRouters/wiki/Simulator-Architecture">here</a>.</li>
-<li>The overall project description, with some real-life examples and caveats, is <a href="https://github.com/SCCapstone/ErlangRouters/wiki/Project-Description">here</a>.</li>
-<li>The mathematical description of the simulation, including explainations of the algorithms used to load-balance, is <a href="https://www.overleaf.com/read/tqndznjvbtfk">here</a>.</li>
-</ul>
+<dl>
+	<dt>Architecture of the simulator:</dt>
+		<dd>
+			<ul>
+				<li>Simulates a cluster/server environment</li>
+				<li>Code is divided into modules</li>
+				<li>Overseer module presides on the surface level invoking both 
+				simulation operations and the allocation algorithms</li>
+				<li>Overseer takes user input to spawn a specified number of servers, clients, groups, 
+				 set the capacity of each server, and choose which algorithm to use</li>
+				<li>The output from running the algorithm is allocated to a CSV where 
+				it is used in a bar chart using d3 to display how clients 
+				are moved between servers to cut down on server to server communication</li>
+			</ul>
+		</dd>
+	<dt>Project description:</dt>
+		<dd>
+			<ul>
+				<li>Implement a load balancing system in an Internet of Things environment</li>
+				<li>We have clients, which could be any sort of device, coming onto
+				servers and each client is assigned to an organization</li>
+				<li>We want to send clients in the same organization to the same server</li>
+				<li>Through this we will cut down on server to server communication, 
+				which can be costly</li>
+			</ul>
+		</dd>
+</dl>
 
 <p>Here is a video explaining our code, what it does, and we also show our program running and the visualizations it creates.
 </p>
@@ -37,7 +59,8 @@
 	<source src="VideoManualDraft.mp4" type="video/mp4">
 </video>
 
-<p>Here is our mathematical paper describing the problem and our program in more detail</p>
+<p>Here is a mathematical paper describing the problem and our program in more detail.  
+It is still a work in progress, but this is the latest version below.</p>
 <object width="718" height="700" data="functional-requirements.pdf"></object>
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/SCCapstone/ErlangRouters">ErlangRouters</a> is maintained by <a href="https://github.com/SCCapstone">SCCapstone</a>.</span>
