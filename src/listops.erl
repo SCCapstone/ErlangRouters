@@ -17,10 +17,10 @@
 %% {LIST} List - the list to be changed
 %% {INT} Index - The index of the value to be changed
 %% {ANY} Value - The new value
+-spec change(list(), number(), number()) -> list().
 change(List, Index, Value) ->
     OutputList = change_listval(List, [], Index, Value, 1),
     OutputList.
-
 
 %% ----------------------------------------------------------------------------
 %% @doc change_listval/5
@@ -38,6 +38,7 @@ change(List, Index, Value) ->
 %% Runtime count = length of InputList
 %% It might be possible to speed this up signficantly via concatenation.
 %%
+-spec change_listval(list(), list(), number(), number(), number()) -> list().
 change_listval(InputList, OutputList, Index, Value, Iterator)
     when Iterator =< length(InputList) ->
     case Iterator == Index of
@@ -51,14 +52,10 @@ change_listval(InputList, OutputList, Index, Value, Iterator)
 change_listval(InputList, OutputList, Index, Value, Iterator) ->
     OutputList.
 
-
-
-
-
-
 %% ----------------------------------------------------------------------------
 %% @doc sum/1
 %% Calls the sum_integers function with the inputted list.
+-spec sum(list()) -> number().
 sum(List) ->
     Sum = sum_integers(List, 0, 1),
     Sum.
@@ -73,6 +70,7 @@ sum(List) ->
 %% Possible TODO: Make it take the sum up to a certain index value?
 %% I kind of hesistate to do that because 
 %% it's really easy break if incorrect indecies are inputted.
+-spec sum_integers(list(), number(), number()) -> number().
 sum_integers(List, Sum, Iterator) 
     when Iterator =< length(List) ->
     CurrentSum = lists:nth(Iterator, List),
@@ -80,19 +78,15 @@ sum_integers(List, Sum, Iterator)
 sum_integers(List, Sum, Iterator) ->
     Sum.  
 
-
-
 %% ----------------------------------------------------------------------------
 %% @doc max_index/1
 %%
 %% Calls indexof_maxvalue and gets the index first highest value for 
 %% the inputted list.
+-spec max_index(list()) -> number().
 max_index(List) ->
     OutputIndex = indexof_maxvalue(List, 1, 1),
     OutputIndex.
-
-
-
 
 %% ----------------------------------------------------------------------------
 %% @doc indexof_maxvalue/3
@@ -102,6 +96,7 @@ max_index(List) ->
 %% Usage: indexof_maxvalue(List,1,1) will find the index of the 
 %% first highest value in List. 
 %%
+-spec indexof_maxvalue(list(), number(), number()) -> number().
 indexof_maxvalue(List, MaxIndex, Iterator) 
     when Iterator =< length(List) ->
     CurrentValue = lists:nth(Iterator, List),
@@ -121,6 +116,7 @@ indexof_maxvalue(List, MaxIndex, Iterator) ->
 %% This function replaces the element of a List at index Index with
 %% NewElement through list manipulation.
 %% change_element(Index, List, NewElement) -> List.
+-spec change_element(number(), list(), number()) -> list().
 change_element(1, [_|After], NewElement) ->
     [NewElement|After];
 change_element(I, [Before|After], NewElement) ->

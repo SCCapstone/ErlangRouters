@@ -19,11 +19,10 @@
 %% in terms of how many other servers it must communicate with.
 %% 
 %%
+-spec servers(list()) -> list().
 servers(GroupList) ->
     OutputList = get_all_server_frag(GroupList, [], 1),
     OutputList.
-
-
 
 %% ----------------------------------------------------------------------------
 %% @doc get_all_server_frag/3
@@ -34,6 +33,7 @@ servers(GroupList) ->
 %% and a default Iterator of 1. i.e get_all_server_frag(Grouplist, [], 1)
 %% 
 %% Runtime = #Servers * (#Servers * #Groups) - get_server_frag
+-spec get_all_server_frag(list(), list(), number()) -> list().
 get_all_server_frag(GroupList, BlankList, Iterator) 
     when Iterator =< length(GroupList) ->
         TargetIndex = Iterator,
@@ -54,6 +54,7 @@ get_all_server_frag(GroupList, BlankList, Iterator) ->
 %% for the server corresponding to TargetIndex.
 %%
 %% Runtime Count = #Servers *  #Groups(get_common_clients)
+-spec get_server_frag(list(), number(), number(), number()) -> number().
 get_server_frag(GroupList, TargetIndex, FragCount, Iterator) 
     when Iterator =< length(GroupList) ->
         TargetServer = lists:nth(TargetIndex, GroupList),
@@ -78,6 +79,7 @@ get_server_frag(GroupList, TargetIndex, FragCount, Iterator) ->
 %% We output an index list of the groups they have in common
 %% 
 %% Runtime count = #Groups
+-spec get_common_clients(list(), list(), list(), number()) -> list().
 get_common_clients(ServerA, ServerB, InCommon, Iterator) 
     when Iterator =< length(ServerA) ->
         ElementA = lists:nth(Iterator, ServerA),
@@ -94,17 +96,16 @@ get_common_clients(ServerA, ServerB, InCommon, Iterator) ->
     ResultList = InCommon,
     ResultList.
 
-
 %% ----------------------------------------------------------------------------
 %% @doc common_groups/1
 %%
 %% Calls get_common_groups
+-spec common_groups(list()) -> list().
 common_groups(GroupList) ->
     SampleServer = lists:nth(1,GroupList),
     NumberofGroups = length(SampleServer),
     OutputList = get_common_groups(GroupList, [], NumberofGroups, 1),
     OutputList.
-
 
 %% ----------------------------------------------------------------------------
 %% @doc get_common_groups/4
@@ -114,6 +115,7 @@ common_groups(GroupList) ->
 %% We output an index list of the groups they have in common
 %% 
 %% Runtcount = #Groups * #severs(get_group_frag)
+-spec get_common_groups(list(), list(), number(), number()) -> list().
 get_common_groups(GroupList, CommonGList, NumberofGroups, Iterator) 
     when Iterator =< NumberofGroups ->
         NewValue = get_group_frag(GroupList, Iterator, 0, 1),
@@ -129,6 +131,7 @@ get_common_groups(GroupList, CommonGList, NumberofGroups, Iterator) ->
 %%  
 %%  
 %% Runtime count = #Servers
+-spec get_group_frag(list(), number(), number(), number()) -> number().
 get_group_frag(GroupList, GroupIndex, TotalFrag, Iterator)
     when Iterator =< length(GroupList) ->
         CurrentServer = lists:nth(Iterator, GroupList),
@@ -142,16 +145,15 @@ get_group_frag(GroupList, GroupIndex, TotalFrag, Iterator)
 get_group_frag(GroupList, GroupIndex, TotalFrag, Iterator) ->
     TotalFrag.
 
-
 %% ----------------------------------------------------------------------------
-%% @doc clients/2
+%% @doc group_clients/2
 %%
 %%
 %%
+-spec group_clients(list(), number()) -> number().
 group_clients(GroupList, GroupIndex) ->
     OutputValue = get_group_clients(GroupList, GroupIndex, 0, 1),
     OutputValue.
-
 
 %% ----------------------------------------------------------------------------
 %% @doc get_group_clients/4
@@ -160,6 +162,7 @@ group_clients(GroupList, GroupIndex) ->
 %%  
 %%  
 %% Runtime count = #Servers
+-spec get_group_clients(list(), number(), number(), number()) -> number().
 get_group_clients(GroupList, GroupIndex, TotalClients, Iterator)
     when Iterator =< length(GroupList) ->
     CurrentServer = lists:nth(Iterator, GroupList),
@@ -168,20 +171,19 @@ get_group_clients(GroupList, GroupIndex, TotalClients, Iterator)
 get_group_clients(GroupList, GroupIndex, TotalClients, Iterator) ->
     TotalClients.
 
-
-
 %% ----------------------------------------------------------------------------
 %% @doc open_cap/2
 %% quick way to get server capacity via Grouplist and save some space 
 %% elsewhere
 %%
 %% runtime count = #Groups
+-spec open_cap(list(), number()) -> number().
 open_cap(Server, Capacity) ->
     Allocated = listops:sum(Server),
     Remaining = Capacity - Allocated,
     Remaining.
 
-
+-spec reassign_group(list(), number(), number(), list(), number()) -> list(). 
 reassign_group(GroupList, GroupIndex, ServerIndex, ReceiveServer, Iterator)
     when Iterator =< length(GroupList) ->
     CurrentServer = lists:nth(Iterator, GroupList),
