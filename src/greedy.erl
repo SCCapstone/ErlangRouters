@@ -6,6 +6,7 @@
 
 -module(greedy).
 -export([do_greedy/4, reassign_clients/5, move_clients/5]).
+-behavior(load_balancer).
 
 %% ----------------------------------------------------------------------------
 %% @doc do_greedy/4

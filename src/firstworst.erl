@@ -14,8 +14,7 @@
 
 -module(firstworst).
 -export([first_worst/3]).
-
-
+-behavior(load_balancer).
 
 %% ----------------------------------------------------------------------------
 %% @doc first_worst/2
@@ -61,9 +60,7 @@ first_worst(GroupList, Capacity, StartTime) ->
     io:format("Elapsed time: ~w microseconds.~n", [ElapsedTime]),
     
     NewGroupList.
-
-
-
+    
 %% ----------------------------------------------------------------------------
 %% @doc expunge_frag/5
 %% Use the fragcalcuations to do a more 'clever' algorithim
@@ -103,9 +100,6 @@ expunge_frag(GroupList, CommGList, WGInd, WFrag, Capacity)
 expunge_frag(GroupList, CommGList, WGInd, WFrag, Capacity) ->
     GroupList.
 
-
-
-
 %% ----------------------------------------------------------------------------
 %% @doc purge_group/4
 %% This will attempt to eliminate all fragmentation on the group corresponding
@@ -142,7 +136,6 @@ purge_group(GroupList, WGInd, GroupClients, Capacity, Iterator)
     end;
 purge_group(GroupList, WGInd, GroupClients, Capacity, Iterator) ->
     GroupList.
-
 
 %% ----------------------------------------------------------------------------
 %% @doc reassign_Group/5
