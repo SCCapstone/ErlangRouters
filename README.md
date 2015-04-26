@@ -1,12 +1,10 @@
 #README: SCCapstone - ErlangRouters Project
 
-Lasted edited: 3/31/2015  
 Team members: Graham Brooker, Paul Melton, Davis Alexander, George Akhvlediani, Joe McDowell
 
 ## What's in the Repo?
 
-If you are reading this, then you should have downloaded the ErlangRouters Repository.  
-Within this repository you should see:  
+Within the ErlangRouters repository, you should see:  
 * docs       [directory]       - Files and resources that are not affiliated with the source code.
 * src        [directory]       - The actual Erlang code for the project.
 * .gitignore [text file]    - Sets git ignore properties
