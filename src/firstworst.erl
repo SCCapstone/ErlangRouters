@@ -28,6 +28,7 @@
 %% {INT} Capacity - (currently) global value for capacity limit of all servers.
 %%
 %% Runtime expense: 
+-spec first_worst(list(), number(), {number(), number(), number()}) -> list().
 first_worst(GroupList, Capacity, StartTime) ->
 
     %% A list that indicates the number of servers each group has clients on.
@@ -66,8 +67,8 @@ first_worst(GroupList, Capacity, StartTime) ->
 %% Use the fragcalcuations to do a more 'clever' algorithim
 %%
 %% Parameters:
-%% {LIST} GroupList - should be obvious
-%% {LIST} CommGList - also pretty obvious, give me a break I am really tired.
+%% {LIST} GroupList - the group list
+%% {LIST} CommGList - common group list
 %% {INT} WGInD - index of the current most fragmented group
 %% {INT} WFrag - The actual value current worst group's fragmentation.
 %% {INT} Capacity - indicates the Capacity restrictions of all servers
@@ -75,6 +76,7 @@ first_worst(GroupList, Capacity, StartTime) ->
 %%  
 %% We might want to run multiple passes of expunge if it's not too costly
 %%
+-spec expunge_frag(list(), list(), number(), number(), number()) -> list().
 expunge_frag(GroupList, CommGList, WGInd, WFrag, Capacity)
     when WFrag > 1 ->
         %% NewGL is the recursive modification to GroupList
@@ -108,12 +110,13 @@ expunge_frag(GroupList, CommGList, WGInd, WFrag, Capacity) ->
 %% 
 %%
 %% Parameters:
-%% {LIST} GroupList - should be obvious
+%% {LIST} GroupList - the group list
 %% {INT} WGInD - index of the current most fragmented group
 %% {INT} GroupClients - number of clients in group
 %% {INT} Capacity - indicates the Capacity restrictions of all servers
-%% {INT} Iterator - duh
+%% {INT} Iterator - recursive iterator
 %%
+-spec purge_group(list(), number(), number(), number(), number()) -> list().
 purge_group(GroupList, WGInd, GroupClients, Capacity, Iterator)
     when Iterator =< length(GroupList) ->
     CurrentServer = lists:nth(Iterator, GroupList),
@@ -144,12 +147,13 @@ purge_group(GroupList, WGInd, GroupClients, Capacity, Iterator) ->
 %%
 %%
 %% Parameters:
-%% {LIST} GroupList - should be obvious
+%% {LIST} GroupList - the group list
 %% {INT} GroupIndex - index of the group being reallocated
 %% {INT} SIndex - index of the server receiving the group
 %% {List} RcvServer - actual configuration of receiving server
-%% {INT} Iterator - duh
+%% {INT} Iterator - recursive iterator
 %%
+-spec reassign_group(list(), number(), number(), list(), number()) -> list().
 reassign_group(GroupList, GroupIndex, SIndex, RcvServer, Iterator)
     when Iterator =< length(GroupList) ->
     CurrentServer = lists:nth(Iterator, GroupList),
