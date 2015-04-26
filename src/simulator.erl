@@ -29,6 +29,7 @@
 %%         the removal of ClientChange number of clients from the server.
 %%     increase_state- same as decrease_state, but instead increases its 
 %%         state by ClientChange.
+-spec server(number(), number()) -> none().
 server(State, ServerCapacity) ->
     receive
         {request, Return_PID, Group_ID} ->
@@ -70,6 +71,7 @@ server(State, ServerCapacity) ->
 %% is indeed the case, the client sends a new_server_pid message to the master
 %% server requesting the PID of another server in the cluster that it can join.
 %% The client then pings the new server in an attempt to join it instead.
+-spec client(pid(), number()) -> none().
 client(Server_Address, Group) ->
     Server_Address ! {request, self(), Group},
     io:format("For client number ~w, Group_ID: ~w~n", [self(), Group]),
@@ -99,6 +101,7 @@ client(Server_Address, Group) ->
 %% Input: NumberOfClients- Number of Clients to be spawned by the function
 %%        NumberOfGroups- Number of different groups clients can be a part of
 %% Output: None.
+-spec spawn_clients(number(), number()) -> none().
 spawn_clients(NumberOfClients, NumberOfGroups) when NumberOfClients > 0 ->
     ServerList = ets:tab2list(server_list),
     Server_PID = pick_random_server(ServerList),
@@ -116,7 +119,8 @@ spawn_clients(0, NumberOfGroups) ->
 %% inserted into the global ets table server_list. 
 %%
 %% Input: NumberOfServers- the number of servers to be spawned
-%% Ouput: None 
+%% Ouput: None
+-spec spawn_servers(number(), number()) -> none().
 spawn_servers(NumberOfServers, ServerCapacity) when NumberOfServers > 0 ->
     io:format("Number of servers left to spawn: ~w~n", [NumberOfServers]),
     Server_PID = spawn(simulator, server, [0, ServerCapacity]),
@@ -130,6 +134,7 @@ spawn_servers(0, ServerCapacity) ->
 %% @doc pick_random_server(ServerList). 
 %% Takes in the list of all Server_PIDs spawned by the simulator and 
 %% returns a random Server_PID from ServerList.
+-spec pick_random_server(list()) -> pid().
 pick_random_server(ServerList) ->
     ListIndex = random:uniform(length(ServerList)),
     ServerTuple = lists:nth(ListIndex, ServerList),
