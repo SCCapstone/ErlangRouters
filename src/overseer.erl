@@ -94,7 +94,7 @@ master_server(NumberOfGroups) ->
             print_group_list(File_PID, GroupList, 1, NumberOfGroups),
             master_server(NumberOfGroups);
             
-        {nonfull_server_request, Return_PID} ->
+        { nonfull_server_request, Return_PID} ->
             ServerList = ets:tab2list(server_list),
             NewServer_PID = simulator:pick_random_server(ServerList),
             Return_PID ! {new_server_pid, NewServer_PID},
@@ -114,6 +114,8 @@ load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
     Algorithm) ->
     File_PID = whereis(notbefore),
     GroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
+    FragCalc = fragcalc:common_groups(GroupList),
+    io:format("GroupList fragmentation pre-allocation: ~n~w~n", [FragCalc]),
     
     case {Algorithm} of
         {Algorithm} when Algorithm =:= "greedy" ->
@@ -211,7 +213,7 @@ get_matched_clients(Server_PID) ->
     ClientMatches.
 
 %% ----------------------------------------------------------------------------
-%% @doc handle_client_movement/3
+%% @doc handle_client_movement/4
 %% Updates dictionary by moving all clients from RemovalServer_PID in group Group_ID
 %% to AdditionServer_PID. It then sends a message to both servers, altering each of
 %% their respective states.
