@@ -37,8 +37,6 @@ do_greedy(GroupList, ServerCapacity, GreedyIndex, StartTime) ->
     ElapsedTime = timer:now_diff(EndTime, StartTime),
     io:format("Greedy algorithm completed.~n"),
     io:format("Elapsed time: ~w microseconds.~n", [ElapsedTime]),
-    FragCalc = fragcalc:common_groups(GroupList),
-    io:format("Group fragmentation post-greedy allocation: ~n~w~n", [FragCalc]),
     Master_PID = whereis(master_server),
     Master_PID ! {print_group_list, GroupList}.
 
