@@ -27,6 +27,7 @@
 %% algorithm. Deletes the previous version of the output in the D3 directory,
 %% copies the new output in the current directory to the D3 directory, and
 %% deletes the output in the current directory.
+-spec main() -> none().
 main() ->  
 
     {ok, [X]} = io:fread("Enter the number of clients> ", "~d"),
@@ -85,6 +86,7 @@ main() ->
 %%         a new server for the client and sends the PID of that server
 %%         back to the client.
 %%
+-spec master_server(number()) -> none().
 master_server(NumberOfGroups) ->
     receive
         {print_group_list, GroupList} ->
@@ -109,7 +111,8 @@ master_server(NumberOfGroups) ->
 %%        NumberOfServers- number of servers present in the simulation.
 %%        ServerCapacity- maximum number of clients a server can hold.
 %%        Algorithm- string name of the algorithm selected by the user.
-%% Output: None.    
+%% Output: None. 
+-spec load_balancer(number(), number(), number(), string()) -> none().   
 load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
     Algorithm) ->
     File_PID = whereis(notbefore),
@@ -135,7 +138,8 @@ load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
 %% PIDs can be accessed globally.
 %%
 %% Input: None.
-%% Output: None.    
+%% Output: None.
+-spec spawn_files() -> none().    
 spawn_files() ->
     OneFile = file:open("before.csv", [write]),
     FilePID = element(2, OneFile),
@@ -155,6 +159,7 @@ spawn_files() ->
 %%            index of the GroupList.
 %%        NumberOfGroups- total number of possible groups in the simulation.
 %% Output: None.
+-spec print_group_list(pid(), list(), number(), number()) -> none().
 print_group_list(File_PID, GroupList, GroupListIterator, NumberOfGroups) ->
     case GroupListIterator =< length(GroupList) of
         true ->
@@ -183,6 +188,7 @@ print_group_list(File_PID, GroupList, GroupListIterator, NumberOfGroups) ->
 %%        GroupListIterator- initially 1, allows the function to iterate
 %%            through every server in the simulation.
 %% Output: GroupList- final GroupList of type [[]] and size NumberOfServers.
+-spec get_group_list(number(), number(), list(), number()) -> list().
 get_group_list(NumberOfGroups, NumberOfServers, GroupList, GroupListIterator) ->
     case GroupListIterator =< NumberOfServers of
         true ->
@@ -208,6 +214,7 @@ get_group_list(NumberOfGroups, NumberOfServers, GroupList, GroupListIterator) ->
 %% Input: Server_PID- Server_PID to be matched.
 %% Output: ClientMatches- List of lists, where each element is a match in the dictionary
 %% to the particular Server_PID input.
+-spec get_matched_clients(pid()) -> list().
 get_matched_clients(Server_PID) -> 
     ClientMatches = ets:select(dictionary, [{{'$1',Server_PID,'$3'},[],['$$']}]),
     ClientMatches.
@@ -222,6 +229,7 @@ get_matched_clients(Server_PID) ->
 %%        AdditionServer_PID- server clients are being added to.
 %%        Group_ID- group ID number of clients that are being moved.
 %% Output: None.
+-spec handle_client_movement(pid(), pid(), number(), pid()) -> none().
 handle_client_movement(RemovalServer_PID, AdditionServer_PID, Group_ID,
     Return_PID) ->
     ClientsMoved = ets:select(dictionary, [{{'$1', RemovalServer_PID, Group_ID}, 
@@ -256,6 +264,7 @@ handle_client_movement(RemovalServer_PID, AdditionServer_PID, Group_ID,
 %%        Group_ID- group ID number of clients that are being moved.
 %%        ClientIndex- iterator for the ClientList.
 %% Output: None.
+-spec insert_new_client(list(), pid(), number(), number()) -> none().
 insert_new_client(ClientList, AdditionServer_PID, Group_ID, ClientIndex) ->
     case ClientIndex =< length(ClientList) of
         true ->
@@ -274,6 +283,7 @@ insert_new_client(ClientList, AdditionServer_PID, Group_ID, ClientIndex) ->
 %% by using recursion to grab the second element of every element in 
 %% GroupList, add that to TempList, which is a 'running count' of the
 %% elements, then returns TempList once GroupList has been exhausted.
+-spec get_second_element(list(), list(), number()) -> list().
 get_second_element(GroupList, AppendList, ElementIndex) 
     when ElementIndex =< length(GroupList) ->
     
@@ -292,6 +302,7 @@ get_second_element(GroupList, TempList, ElementIndex)
 %% [#Clients in Group 1, .., #Clients in Group NumberOfGroups]. Uses
 %% the function get_num_clients to get the value of the number of instances
 %% of a particular Group ID in GroupList.
+-spec count_groups(list(), list(), number(), number()) -> list().
 count_groups(GroupList, RunningCount, NumberOfGroups, GroupIndex) 
     when GroupIndex =< NumberOfGroups ->
   
@@ -307,6 +318,7 @@ count_groups(GroupList, ActualRunningCount, NumberOfGroups, GroupIndex)
 %% Prints the list GroupCount to the file represented by the process identifier
 %% File_PID in a format properly recognized by D3. For the purposes of our demo,
 %% the type of file being printed to is a csv file.
+-spec print_group_count(pid(), list(), number(), number()) -> none().
 print_group_count(File_PID, GroupCount, CountIndex, NumberOfGroups) 
     when CountIndex =< NumberOfGroups ->
     
@@ -329,6 +341,7 @@ print_group_count(File_PID, GroupCount, CountIndex, NumberOfGroups)
 %% For a particular GroupID value, this function sweeps through GroupList
 %% and counts the number of times that that value appears in GroupList. This
 %% is returned by the function by NewNumClients.
+-spec get_num_clients(list(), number(), number(), number()) -> number().
 get_num_clients(GroupList, GroupIndex, NumClients, GroupListIndex) 
     when GroupListIndex =< length(GroupList) ->
   
@@ -350,6 +363,7 @@ get_num_clients(GroupList, GroupIndex, NewNumClients, GroupListIndex)
 %% @doc print_file_header/3
 %% Prints the properly formatted group labels to the csv file represented by the
 %% process identifier File_PID.
+-spec print_file_header(pid(), list(), number()) -> none().
 print_file_header(File_PID, GroupCount, NumberOfGroups) 
     when GroupCount =< NumberOfGroups ->
     

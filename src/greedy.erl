@@ -6,6 +6,7 @@
 
 -module(greedy).
 -export([do_greedy/4, reassign_clients/5, move_clients/5]).
+-behavior(load_balancer).
 
 %% ----------------------------------------------------------------------------
 %% @doc do_greedy/4
@@ -16,6 +17,8 @@
 %% server has had its chance to 'be greedy', the total elapsed time for the
 %% algorithm is printed and the final GroupList is sent to the master server
 %% to be printed to csv output for the visualization piece.
+-spec do_greedy(list(), number(), number(), {number(), number(), number()})
+    -> none().
 do_greedy(GroupList, ServerCapacity, GreedyIndex, StartTime)
     when GreedyIndex =< length(GroupList) ->
     
@@ -55,6 +58,7 @@ do_greedy(GroupList, ServerCapacity, GreedyIndex, StartTime) ->
 %% move_clients/4 is called for those two servers and the resultant updated
 %% server lists are inserted into the overall GroupList. The function is
 %% then run for the next possible GreedyServer/OtherServer pair.
+-spec reassign_clients(list(), number(), number(), number(), pid()) -> none().
 reassign_clients(GroupList, ServerCapacity, GroupListIndex,
     GreedyIndex, Return_PID)
     when GroupListIndex =< length(GroupList) ->
@@ -130,6 +134,7 @@ reassign_clients(GroupList, ServerCapacity, GroupListIndex,
 %%
 %% Note: the bulk of the algorithmic work is done here. This function checks
 %% the server capacities, moves the clients, and updates the lists accordingly.
+-spec move_clients(list(), list(), number(), list(), pid()) -> none().
 move_clients(GreedyServerList, NonGreedyServerList, Iterator, RelevantServers,
     Return_PID) ->
     
