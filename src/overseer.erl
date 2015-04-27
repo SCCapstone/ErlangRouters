@@ -96,7 +96,7 @@ master_server(NumberOfGroups) ->
             print_group_list(File_PID, GroupList, 1, NumberOfGroups),
             master_server(NumberOfGroups);
             
-        {nonfull_server_request, Return_PID} ->
+        { nonfull_server_request, Return_PID} ->
             ServerList = ets:tab2list(server_list),
             NewServer_PID = simulator:pick_random_server(ServerList),
             Return_PID ! {new_server_pid, NewServer_PID},
@@ -117,6 +117,8 @@ load_balancer(NumberOfGroups, NumberOfServers, ServerCapacity,
     Algorithm) ->
     File_PID = whereis(notbefore),
     GroupList = get_group_list(NumberOfGroups, NumberOfServers, [], 1),
+    FragCalc = fragcalc:common_groups(GroupList),
+    io:format("GroupList fragmentation pre-allocation: ~n~w~n", [FragCalc]),
     
     case {Algorithm} of
         {Algorithm} when Algorithm =:= "greedy" ->
